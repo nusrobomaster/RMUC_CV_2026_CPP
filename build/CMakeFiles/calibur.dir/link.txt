@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -rdynamic -O3 -g -Wall -Werror -O3 -DNDEBUG -shared -Wl,-soname,libcalibur.so -o /home/li/Desktop/RMUC_2026_CV_CPP_/lib/libcalibur.so CMakeFiles/calibur.dir/calibur/log.cpp.o CMakeFiles/calibur.dir/calibur/util.cpp.o CMakeFiles/calibur.dir/calibur/config.cc.o   -L/apps/yaml-cpp/lib

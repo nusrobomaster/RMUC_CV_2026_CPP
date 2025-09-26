@@ -35,16 +35,16 @@ system:
 
 class:
   person:
-    name: sylar
+    name: calibur
     age: 31
     sex: true
   map:
-      sylar01:
-        name: sylar01
+      calibur01:
+        name: calibur01
         age: 18
         sex: false
-      sylar02:  
-        name: sylar02
+      calibur02:  
+        name: calibur02
         age: 40
         sex: true
   vec_map:

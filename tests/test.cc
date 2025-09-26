@@ -1,33 +1,33 @@
 #include <iostream>
 #include <thread>
-#include "sylar/log.h"
-#include "sylar/util.h"
+#include "calibur/log.h"
+#include "calibur/util.h"
 
 int main(int argc, char** argv) {
-    sylar::Logger::ptr logger(new sylar::Logger);
-    logger->addAppender(sylar::LogAppender::ptr(new sylar::StdoutLogAppender));
+    calibur::Logger::ptr logger(new calibur::Logger);
+    logger->addAppender(calibur::LogAppender::ptr(new calibur::StdoutLogAppender));
 
-    sylar::FileLogAppender::ptr file_appender(new sylar::FileLogAppender("./log.txt"));
+    calibur::FileLogAppender::ptr file_appender(new calibur::FileLogAppender("./log.txt"));
 
-    sylar::LogFormatter::ptr fmt(new sylar::LogFormatter("%d%T%p%T%m%n"));
+    calibur::LogFormatter::ptr fmt(new calibur::LogFormatter("%d%T%p%T%m%n"));
     file_appender->setFormatter(fmt);
 
-    file_appender->setLevel(sylar::LogLevel::ERROR);
+    file_appender->setLevel(calibur::LogLevel::ERROR);
     logger->addAppender(file_appender);
 
-    // sylar::LogEvent::ptr event(new sylar::LogEvent(logger, sylar::LogLevel::INFO, __FILE__, __LINE__, 0, sylar::GetThreadId(), sylar::GetFiberId(), time(0)));
+    // calibur::LogEvent::ptr event(new calibur::LogEvent(logger, calibur::LogLevel::INFO, __FILE__, __LINE__, 0, calibur::GetThreadId(), calibur::GetFiberId(), time(0)));
     // event->getSS() << "Hello Sylar Log";
     
-    // logger->log(sylar::LogLevel::DEBUG, event);
-    std::cout << "hello sylar log" << std::endl;
+    // logger->log(calibur::LogLevel::DEBUG, event);
+    std::cout << "hello calibur log" << std::endl;
 
-    SYLAR_LOG_INFO(logger) << "test macro";
-    SYLAR_LOG_ERROR(logger) << "test macro error";
+    CALIBUR_LOG_INFO(logger) << "test macro";
+    CALIBUR_LOG_ERROR(logger) << "test macro error";
 
-    SYLAR_LOG_FMT_ERROR(logger, "test macro fmt error %s", "aa");
+    CALIBUR_LOG_FMT_ERROR(logger, "test macro fmt error %s", "aa");
 
-    auto l = sylar::LoggerMgr::GetInstance()->getLogger("xx");
-    SYLAR_LOG_INFO(l) << "xxx";
+    auto l = calibur::LoggerMgr::GetInstance()->getLogger("xx");
+    CALIBUR_LOG_INFO(l) << "xxx";
 
     return 0;
 }

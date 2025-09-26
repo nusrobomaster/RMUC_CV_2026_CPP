@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(sylar)
+project(calibur)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -rdynamic -O3 -g -Wall -Werror")
@@ -12,18 +12,18 @@ find_library(YAMLCPP yaml-cpp)
 message("***", ${YAMLCPP})
 
 set(LIB_SRC 
-    sylar/log.cpp
-    sylar/util.cpp 
-    sylar/config.cc 
+    calibur/log.cpp
+    calibur/util.cpp 
+    calibur/config.cc 
 )
 
-add_library(sylar SHARED ${LIB_SRC})
+add_library(calibur SHARED ${LIB_SRC})
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 add_executable(test tests/test.cc)
-target_link_libraries(test sylar ${YAMLCPP})
+target_link_libraries(test calibur ${YAMLCPP})
 
 add_executable(test_config tests/test_config.cc)
-target_link_libraries(test_config sylar ${YAMLCPP})
+target_link_libraries(test_config calibur ${YAMLCPP})
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
