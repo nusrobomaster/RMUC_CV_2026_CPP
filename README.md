@@ -3,9 +3,9 @@ Supports both stream-style and printf-style logging.
 
 Customizable log formats, log levels, and log separation.
 
-Stream-style usage：SYLAR_LOG_INFO(g_logger) << "this is a log".
+Stream-style usage：CALIBUR_LOG_INFO(g_logger) << "this is a log".
 
-Formatted usage：SYLAR_LOG_FMT_INFO(g_logger, "%s", "this is a log").
+Formatted usage：CALIBUR_LOG_FMT_INFO(g_logger, "%s", "this is a log").
 
 Configurable fields: timestamp, thread ID, thread name, log level, logger name, filename, line number
 
@@ -15,8 +15,8 @@ YAML-based configuration with change notifications
 Supports hierarchical data types and STL containers (vector, list, set, map)),
 Custom type support through serialization/deserialization
 ```cpp
-static sylar::ConfigVar<int>::ptr g_tcp_connect_timeout =
-	sylar::Config::Lookup("tcp.connect.timeout", 5000, "tcp connect timeout");
+static calibur::ConfigVar<int>::ptr g_tcp_connect_timeout =
+	calibur::Config::Lookup("tcp.connect.timeout", 5000, "tcp connect timeout");
 ```
 A TCP connection timeout parameter has been defined. You can directly use g_tcp_connect_timeout->getValue()
 to obtain the parameter's value. When the configuration is modified and reloaded, 
