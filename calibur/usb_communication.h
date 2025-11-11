@@ -6,11 +6,6 @@
 
 namespace calibur {
 
-    struct DataPacket {
-        float yaw;
-        float pitch;
-    };
-
     class USBCommunication {
         public:
         USBCommunication(const std::string& device_path);
@@ -21,7 +16,7 @@ namespace calibur {
         bool isOpen() const;
         
         // Send yaw and pitch
-        bool sendData(float yaw, float pitch);
+        bool sendData(float yaw, float pitch, bool is_fire);
         
         // Configuration
         bool configure(int baudrate = 115200);

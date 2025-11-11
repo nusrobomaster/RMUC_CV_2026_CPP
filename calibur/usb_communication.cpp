@@ -8,13 +8,13 @@
 
 namespace calibur {
 
-    static calibur::Logger::ptr g_logger = CALIBUR_LOG_NAME("usb");
+static calibur::Logger::ptr g_logger = CALIBUR_LOG_NAME("usb");
 
     USBCommunication::USBCommunication(const std::string& device_path)
         : device_path_(device_path)
         , fd_(-1)
         , is_open_(false) {
-        CALIBUR_LOG_INFO(g_logger) << "USBComm created for device: " << device_path_;
+        CALIBUR_LOG_INFO(g_logger) << "USBCommunication created for device: " << device_path_;
     }
 
     USBCommunication::~USBCommunication() {
@@ -101,9 +101,9 @@ namespace calibur {
         tty.c_oflag = 0;
         tty.c_iflag &= ~(IXON | IXOFF | IXANY);
         
-        // Blocking read with timeout
+        // Non-blocking writes
         tty.c_cc[VMIN]  = 0;
-        tty.c_cc[VTIME] = 10; // 1 second timeout
+        tty.c_cc[VTIME] = 0;
         
         if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
             CALIBUR_LOG_ERROR(g_logger) << "Error setting termios attributes: " << strerror(errno);
@@ -114,37 +114,37 @@ namespace calibur {
         return true;
     }
 
-    bool USBCommunication::sendData(float yaw, float pitch) {
+    bool USBCommunication::sendData(float yaw, float pitch, bool is_fire) {
         if (!is_open_ || fd_ < 0) {
             CALIBUR_LOG_ERROR(g_logger) << "Cannot send: USB device not open";
             return false;
         }
         
-        // Create packet: [header(0xAA), yaw(4 bytes), pitch(4 bytes), checksum (1 byte)]
-        uint8_t packet[10];
+        uint8_t packet[11];
         packet[0] = 0xAA; // Header
         
-        // Copy yaw (4 bytes)
         memcpy(&packet[1], &yaw, sizeof(float));
         
-        // Copy pitch (4 bytes)
         memcpy(&packet[5], &pitch, sizeof(float));
         
-        // Simple checksum: XOR of all bytes
+        packet[9] = is_fire ? 0x01 : 0x00;
+        
         uint8_t checksum = 0;
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < 10; i++) {
             checksum ^= packet[i];
         }
-        packet[9] = checksum;
+        packet[10] = checksum;
         
-        ssize_t written = write(fd_, packet, 10);
-        if (written != 10) {
-            CALIBUR_LOG_ERROR(g_logger) << "Write failed: expected 10 bytes, wrote " 
+        ssize_t written = write(fd_, packet, 11);
+        if (written != 11) {
+            CALIBUR_LOG_ERROR(g_logger) << "Write failed: expected 11 bytes, wrote " 
                                         << written << ", error: " << strerror(errno);
             return false;
         }
         
-        CALIBUR_LOG_DEBUG(g_logger) << "Sent data: yaw=" << yaw << ", pitch=" << pitch;
+        CALIBUR_LOG_DEBUG(g_logger) << "Sent data: yaw=" << yaw << ", pitch=" << pitch 
+                                    << ", is_fire=" << (is_fire ? "true" : "false");
         return true;
     }
-} // namespace calibur
+
+} 
