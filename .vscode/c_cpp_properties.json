@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "D:/OpenCV/build/include",
-                "D:/yaml-cpp/include"
+                "D:/yaml-cpp/include",
+                "/usr/include/eigen3"
             ],
             "defines": [
                 "_DEBUG",
