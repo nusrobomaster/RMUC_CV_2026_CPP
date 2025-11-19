@@ -6,7 +6,8 @@
                 "${workspaceFolder}/**",
                 "D:/OpenCV/build/include",
                 "D:/yaml-cpp/include",
-                "/usr/include/eigen3"
+                "/usr/include/eigen3",
+                "${workspaceFolder}/calibur/pf"
             ],
             "defines": [
                 "_DEBUG",

@@ -80,7 +80,7 @@ DetectionWorker::yolo_predict(const std::vector<uint8_t> &raw, int w, int h) {
 }
 
 void DetectionWorker::refine_keypoints(std::vector<DetectionResult> &dets, int w, int h) {
-    // thresholding + CV::refine
+    // trad CV refine
 }
 
 void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {

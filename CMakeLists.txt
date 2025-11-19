@@ -79,6 +79,14 @@ target_link_libraries(test_config calibur ${YAMLCPP})
 add_executable(test_send_data tests/test_send_data.cc)
 target_link_libraries(test_send_data calibur ${YAMLCPP})
 
+add_subdirectory(calibur/pf)
+add_subdirectory(calibur/worker)
+
+add_executable(calibur_main main.cpp)
+target_link_libraries(calibur_main
+    PRIVATE calibur_worker
+)
+
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 

@@ -107,11 +107,9 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
         pos_lead[1] += drop_correction;
     }
 
-    // --- calculate_correction -> yaw, pitch ---
     correction = calculate_gimbal_correction(pos_lead);
-
-    // --- should_fire -> aim, fire, chase ---
     const bool fire_state  = should_fire(pos_lead);
+    
     const bool chase_state = (pos_lead[2] > CHASE_THREASHOLD);
     const bool aim_state   = true;  // TODO: hook to PF state machine
 

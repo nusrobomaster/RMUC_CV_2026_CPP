@@ -8,14 +8,14 @@
 
 
 // ------------------------------------------- Constants -------------------------------------------
-#define ALPHA_BULLET_SPEED                      0.1f
+#define ALPHA_BULLET_SPEED                      0.1f    // low-pass filter coeff, detemine using cutoff freq formula: alpha = 2πf_c * dt / (2πf_c * dt + 1)
 #define ALPHA_PROCESSING_TIME                   0.1f
 #define PREDICTION_CONVERGENCE_THRESHOLD        0.01f
 #define CHASE_THREASHOLD                        6.0f
 #define PRED_CONV_MAX_ITERS                     10
 #define WIDTH_TOLERANCE                         0.13f  // meters
 #define HEIGHT_TOLERANCE                        0.13f  // meters
-#define TOLERANCE_COEFF                         1.0f   // empirical scaling
+#define TOLERANCE_COEFF                         1.0f
 
 //--------------------------------------------Camera Worker--------------------------------------------
 
@@ -115,9 +115,12 @@ public:
     void operator()();
 
 private:
+    static constexpr float kDt = 0.01f;
     SharedLatest    &shared_;
     std::atomic<bool> &stop_;
     uint64_t        last_det_ver_;
+
+    RBPFPosYawModelGPU *g_pf = nullptr;
 
     // PF / CUDA interfaces to implement in .cpp
     void gpu_pf_init();
