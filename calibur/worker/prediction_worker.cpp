@@ -51,10 +51,11 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
                         PredictionOut &out)
 {
     // Reuse small buffers instead of reallocating every call
-    static thread_local Eigen:Vector3f tvec;
-    static thread_local Eigen:Vector3f pos_lead;
-    static thread_local Eigen:Vector2f correction;
+    static thread_local Eigen::Vector3f tvec;
+    static thread_local Eigen::Vector3f pos_lead;
+    static thread_local Eigen::Vector2f correction;
     static thread_local float yaw_lead, imu_yaw, imu_pitch;
+    static thread_local const std::array<float, ROBOT_STATE_VEC_LEN> state = rs.state;
 
     // --- bullet_speed filtering ---
     float bullet_speed = this->bullet_speed; // keep in a register
@@ -71,7 +72,6 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
     this->processing_time = processing_time;
 
     // --- convergence method for motion model (WORLD frame) ---
-    tvec.resize(3);
     tvec[0] = rs.state[0];
     tvec[1] = rs.state[1];
     tvec[2] = rs.state[2];
@@ -95,9 +95,6 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
              iter < MAX_ITERS);
 
     // --- world2cam using imu yaw/pitch ---
-    //Eigen::Matrix3f R_world2cam = world2cam(this->shared_);
-    //pos_lead = pos_world2cam(pos_lead, R_world2cam);
-    //TODO: convert yaw from world to cam for better yaw accuracy
     bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
     //if success: ...
     Eigen::Matrix3f R_world2cam = make_R_world2cam_from_yaw_pitch(imu_yaw, imu_pitch);
@@ -110,7 +107,7 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
     const float drop_correction = 0.5f * 9.81f * t_bullet_travel * t_bullet_travel;
     pos_lead[1] += drop_correction;
 
-    correction = calculate_gimbal_correction(pos_lead);
+    calculate_gimbal_correction(pos_lead, correction);
     const bool fire_state  = should_fire(pos_lead);
     
     const bool chase_state = (pos_lead[2] > CHASE_THREASHOLD);
@@ -130,7 +127,7 @@ inline bool is_converged(float v, float threshold) {
     return std::fabs(v) < threshold;
 }
 
-inline float t_lead_calculation(const Eigen::Vector3f> &tvec, const float &bullet_speed) {
+inline float t_lead_calculation(const Eigen::Vector3f &tvec, const float &bullet_speed) {
     const float dx = tvec[0];
     const float dy = tvec[1];
     const float dz = tvec[2];
@@ -144,8 +141,6 @@ inline float t_lead_calculation(const Eigen::Vector3f> &tvec, const float &bulle
 
 inline int sector_from_yaw(const float yaw) {
     // Precompute constants once per TU, not per call
-    constexpr float HALF_PI    = static_cast<float>(M_PI_2);
-    constexpr float QUARTER_PI = static_cast<float>(M_PI_4);
     const float theta = wrap_pi(yaw);
     const float sector_f = (theta + QUARTER_PI) / HALF_PI;
     return static_cast<int>(std::floor(sector_f)) & 3;
@@ -169,7 +164,8 @@ inline void calculate_robot_final_target_point(Eigen::Vector3f &final_pos, float
     final_pos[1] += armor_plate_idx ? height_offset : 0;
 }
 
-inline void motion_model_robot_pos(const Eigen::Vector3f &state, Eigen::Vector3f &robot_center_lead, float &yaw_lead, const float &t) {
+inline void motion_model_robot_pos(const std::array<float, ROBOT_STATE_VEC_LEN> &state, 
+                                    Eigen::Vector3f &robot_center_lead, float &yaw_lead, const float &t) {
     const float t2 = t * t;
     robot_center_lead[0] = state[0] + state[3] * t + 0.5 * state[6] * t2;
     robot_center_lead[1] = state[1] + state[4] * t + 0.5 * state[7] * t2;
@@ -184,7 +180,6 @@ inline void calculate_gimbal_correction(const Eigen::Vector3f &tvec, Eigen::Vect
     correction[0] = std::atan2(x, z);
     correction[1] = std::atan2(y, z);
 
-    return correction;
 }
 
 inline int should_fire(const Eigen::Vector3f &tvec) {

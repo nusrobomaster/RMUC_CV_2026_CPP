@@ -73,6 +73,10 @@
         "__nullptr": "cpp",
         "geometry": "cpp",
         "*.cuh": "cuda-cpp",
-        "*.cu": "cuda-cpp"
+        "*.cu": "cuda-cpp",
+        "*.cpp": "cpp",
+        "*.hpp": "cpp",
+        "shared_mutex": "cpp",
+        "cfenv": "cpp"
     }
 }

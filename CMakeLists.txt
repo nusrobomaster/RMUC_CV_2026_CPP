@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(calibur)
+project(calibur LANGUAGE CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -rdynamic -O3 -g -Wall -Werror")
@@ -39,7 +39,7 @@ link_directories(
 add_library(calibur SHARED ${LIB_SRC})
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-add_executable(test_camera calibur tests/test_camera.cc)
+add_executable(test_camera tests/test_camera.cc)
 target_include_directories(test_camera PRIVATE
     /usr/include/opencv4
 )
@@ -54,7 +54,7 @@ target_link_libraries(test_camera calibur MvCameraControl
 )
 
 
-add_executable(test_yolo11 calibur tests/test_yolo.cc)
+add_executable(test_yolo11 tests/test_yolo.cc)
 target_include_directories(test_yolo11 PRIVATE
     /usr/include/opencv4
 )
@@ -82,10 +82,6 @@ target_link_libraries(test_send_data calibur ${YAMLCPP})
 add_subdirectory(calibur/pf)
 add_subdirectory(calibur/worker)
 
-add_executable(calibur_main main.cpp)
-target_link_libraries(calibur_main
-    PRIVATE calibur_worker
-)
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 

@@ -3,6 +3,7 @@
 
 #include <curand_kernel.h>
 #include "worker/workers.hpp"
+#include "worker/types.hpp"
 
 constexpr int CUDA_BLOCK_SIZE = 256;
 
@@ -38,15 +39,6 @@ constexpr float INIT_GEOM_STD_H    = 0.20f;
 // ======================= CONFIG ==========================
 constexpr int D    = 15;  // PF state dim
 constexpr int KF_D = 7;   // KF state dim: [vx,vy,vz,yaw_rate,r1,r2,h]
-
-// State indices in X
-enum StateIdx {
-    IDX_TX = 0, IDX_TY = 1, IDX_TZ = 2,
-    IDX_VX = 3, IDX_VY = 4, IDX_VZ = 5,
-    IDX_AX = 6, IDX_AY = 7, IDX_AZ = 8,
-    IDX_YAW   = 9, IDX_OMEGA = 10, IDX_ALPHA = 11,
-    IDX_R1 = 12, IDX_R2 = 13, IDX_H  = 14
-};
 
 // ======================= PARAMS ==========================
 

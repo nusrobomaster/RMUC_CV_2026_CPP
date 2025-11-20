@@ -8,6 +8,15 @@
 
 
 // ------------------------------------------- Constants -------------------------------------------
+
+// ------------- Detection Constants ---------------
+#define YOLO_CONFIDENCE_THRESHOLD               0.5f
+
+#define DEFAULT_ROBOT_RADIUS                    0.2f
+#define DEFAULT_ROBOT_HEIGHT                    0.0f
+#define SELECTOR_TTL                            0.5f    // seconds
+
+// ------------- Prediction Constants --------------
 #define ALPHA_BULLET_SPEED                      0.1f    // low-pass filter coeff, detemine using cutoff freq formula: alpha = 2πf_c * dt / (2πf_c * dt + 1)
 #define ALPHA_PROCESSING_TIME                   0.1f
 #define PREDICTION_CONVERGENCE_THRESHOLD        0.01f
@@ -74,30 +83,30 @@ private:
     float       ttl_;
     float       initial_yaw_;
     uint64_t    last_cam_ver_;
+    RobotState prev_robot_{};
+    bool       has_prev_robot_ = false;
 
     void sleep_small();
 
     // ---- Interfaces for you to implement in .cpp ----
 
     std::vector<DetectionResult>
-    yolo_predict(const std::vector<uint8_t> &raw, int width, int height);
+    yolo_predict(const std::vector<uint8_t> &raw, int width, int height, std::vector<DetectionResult> &dets);
 
     void refine_keypoints(std::vector<DetectionResult> &dets,
                           int width, int height);
 
     void solvepnp_and_yaw(std::vector<DetectionResult> &dets);
 
-    void transform_to_world(std::vector<DetectionResult> &dets,
-                            const IMUState &imu);
+    void group_armors(const std::vector<DetectionResult> &dets,
+                      std::vector<std::vector<DetectionResult>> &grouped);
 
-    std::vector<std::vector<DetectionResult>>
-    group_armors(const std::vector<DetectionResult> &dets);
 
-    std::vector<DetectionResult>
-    select_armor(const std::vector<std::vector<DetectionResult>> &grouped,
+    void select_armor(const std::vector<std::vector<DetectionResult>> &grouped,
                  float &ttl,
                  int &selected_robot_id,
-                 float &initial_yaw);
+                 float &initial_yaw,
+                 std::vector<DetectionResult> &selected);
 
     std::unique_ptr<RobotState>
     form_robot(const std::vector<DetectionResult> &armors);

@@ -7,7 +7,8 @@
                 "D:/OpenCV/build/include",
                 "D:/yaml-cpp/include",
                 "/usr/include/eigen3",
-                "${workspaceFolder}/calibur/pf"
+                "${workspaceFolder}/calibur/pf",
+                "/usr/include/opencv4"
             ],
             "defines": [
                 "_DEBUG",
@@ -15,11 +16,11 @@
                 "_UNICODE"
             ],
             "windowsSdkVersion": "10.0.26100.0",
-            "compilerPath": "cl.exe",
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "windows-msvc-x64",
-            "configurationProvider": "ms-vscode.cmake-tools"
+            "intelliSenseMode": "linux-gcc-x64",
+            //"configurationProvider": "ms-vscode.cmake-tools"
         }
     ],
     "version": 4
