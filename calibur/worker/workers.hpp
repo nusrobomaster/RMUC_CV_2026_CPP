@@ -7,9 +7,13 @@
 
 #include "types.hpp"
 #include "pf/rbpf.cuh"
+#include "infer.h"
 
 
 // ------------------------------------------- Constants -------------------------------------------
+// ------------- Model Path ------------------------
+const std::string YOLO_MODEL_PATH = "calibur/models/yolo11-pose3.onnx";
+
 
 // ------------- Detection Constants ---------------
 #define YOLO_CONFIDENCE_THRESHOLD               0.5f
@@ -17,6 +21,10 @@
 #define DEFAULT_ROBOT_RADIUS                    0.2f
 #define DEFAULT_ROBOT_HEIGHT                    0.0f
 #define SELECTOR_TTL                            0.5f    // seconds
+
+// ------------- PF constants ----------------------
+static constexpr int NUM_PARTICLES = 10000;
+
 
 // ------------- Prediction Constants --------------
 #define ALPHA_BULLET_SPEED                      0.1f    // low-pass filter coeff, detemine using cutoff freq formula: alpha = 2πf_c * dt / (2πf_c * dt + 1)
@@ -65,6 +73,22 @@ private:
     bool read_imu_stub(IMUState &imu);
 };
 
+//--------------------------------------------YOLO Worker--------------------------------------------
+class YoloWorker {
+public:
+    YoloWorker(SharedLatest& shared,
+               std::atomic<bool>& stop_flag,
+               const std::string& engine_path);
+
+    void operator()();
+
+private:
+    SharedLatest&       shared_;
+    std::atomic<bool>&  stop_;
+    uint64_t            last_cam_ver_ = 0;
+
+    YoloDetector        detector_;      // <-- persistent member
+};
 
 //--------------------------------------------Detection Worker--------------------------------------------
 

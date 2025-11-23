@@ -5,6 +5,7 @@
 #include <vector>
 
 
+//#define INT8_MODE     //turn this on ONLY when having an INT8 model
 const int kGpuId = 0;
 const int kNumClass = 16;
 const int kNumKpt = 4;  // 单个目标对应的关键点的个数

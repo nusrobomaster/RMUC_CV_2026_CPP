@@ -3,9 +3,8 @@
 #include "workers.hpp"
 #include "rbpf.cuh"
 
-static constexpr int NUM_PARTICLES = 10000;
 
-using clock_t = std::chrono::steady_clock;
+using timestamp_clock_t= std::chrono::steady_clock;
 
 PFWorker::PFWorker(SharedLatest &shared,
                    std::atomic<bool> &stop_flag)
@@ -15,7 +14,6 @@ PFWorker::PFWorker(SharedLatest &shared,
 
 void PFWorker::gpu_pf_init() {
     if (!g_pf) {
-        constexpr int NUM_PARTICLES = 10000;
         g_pf = rbpf_create(NUM_PARTICLES);
         // Optionally reset from some initial guess
         RobotState init{};
@@ -40,7 +38,7 @@ RobotState PFWorker::gpu_pf_step(const RobotState &meas) {
 void PFWorker::operator()() {
     gpu_pf_init();
 
-    auto next_tick = clock_t::now();
+    auto next_tick = timestamp_clock_t::now();
 
     while (!stop_.load(std::memory_order_acquire)) {
         // ---- wait until next 10 ms slot ----

@@ -1,23 +1,68 @@
 #!/bin/bash
+set -euo pipefail
 
-# Clear previous build files to avoid cache conflicts
-# Always do this when you modify CMakeLists.txt or in a new complication env to ensure fresh compilation
-rm -rf build
+# Project root = directory of this script
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Create and enter build directory
-# -p flag creates parent directories if needed
-mkdir -p build && cd build
+ARCH="$(uname -m)"
+CALIBUR_PLATFORM=""
+CALIBUR_L4T=""
+BUILD_SUBDIR=""
 
-# Generate build system using CMake
-# -DCMAKE_BUILD_TYPE=Release enables optimizations
-# The ".." means CMakeLists.txt is in parent directory
-cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+if [[ "$ARCH" == "x86_64" ]]; then
+    CALIBUR_PLATFORM="x86"
+    BUILD_SUBDIR="x86"
 
-# Run test program
-# First go to bin directory where executables are output
-# Then execute the test_config binary
-cd ../bin && ./test_config
+elif [[ "$ARCH" == "aarch64" ]]; then
+    CALIBUR_PLATFORM="jetson"
 
-# Return to project root directory
-# This maintains consistent working directory for subsequent operations
-cd ..
+    # Try to auto-detect L4T version from /etc/nv_tegra_release
+    if [[ -f /etc/nv_tegra_release ]]; then
+        if grep -q "R36" /etc/nv_tegra_release; then
+            CALIBUR_L4T="36"
+        elif grep -q "R38" /etc/nv_tegra_release; then
+            CALIBUR_L4T="38"
+        fi
+    fi
+
+    # Fallback / sanity
+    if [[ -z "$CALIBUR_L4T" ]]; then
+        echo "Warning: could not auto-detect L4T version, defaulting to 36"
+        CALIBUR_L4T="36"
+    fi
+
+    BUILD_SUBDIR="jetson${CALIBUR_L4T}"
+else
+    echo "Unsupported architecture: $ARCH"
+    exit 1
+fi
+
+BUILD_DIR="${ROOT_DIR}/build/${BUILD_SUBDIR}"
+
+echo "==> ARCH             : ${ARCH}"
+echo "==> CALIBUR_PLATFORM : ${CALIBUR_PLATFORM}"
+[[ -n "${CALIBUR_L4T:-}" ]] && echo "==> CALIBUR_L4T      : ${CALIBUR_L4T}"
+echo "==> BUILD_DIR        : ${BUILD_DIR}"
+
+# Clean and (re)create build dir
+rm -rf "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}"
+
+# Configure
+cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCUDAToolkit_ROOT=/usr/local/cuda \
+    -DCALIBUR_PLATFORM="${CALIBUR_PLATFORM}" \
+    ${CALIBUR_L4T:+-DCALIBUR_L4T="${CALIBUR_L4T}"}
+
+
+# Build
+cmake --build "${BUILD_DIR}" -- -j"$(nproc)"
+
+# Run test program if it exists
+# if [[ -x "${ROOT_DIR}/bin/test_config" ]]; then
+#     echo "==> Running bin/test_config"
+#     (cd "${ROOT_DIR}/bin" && ./test_config)
+# else
+#     echo "bin/test_config not found or not executable, skipping."
+# fi

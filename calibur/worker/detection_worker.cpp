@@ -3,10 +3,34 @@
 #include <stdlib.h>
 #include <atomic>
 #include <thread>
+#include <opencv2/calib3d.hpp>
 
 #include "workers.hpp"
 #include "types.hpp"
 #include "helper.hpp"
+
+// ================================ Helper Function Prototype Declaration ========================
+inline void cam2world(DetectionResult &det, const Eigen::Matrix3f &R_world2cam,
+                     const float imu_yaw, const float imu_pitch);
+inline float tvec_distance(const Eigen::Vector3f& t);
+static std::array<cv::Point2f, 4> order_quad_clockwise(const std::vector<cv::Point2f> &pts);
+inline static void get_object_points(int armor_type, std::vector<cv::Point3f> &obj_pts);
+inline static float angle_diff_deg(float a, float b);
+inline static float wrap_deg(float a);
+inline int choose_best_robot(const std::vector<std::vector<DetectionResult>>& grouped_armors);
+inline int sector_yaw(const float yaw_meas, const float prev_yaw);
+inline bool from_one_armor(const DetectionResult &det, RobotState &robot, bool &valid);
+inline void correct_yaw_to_90(float &yaw1, float &yaw2);
+inline bool solve_linear_sys(
+    float yaw1, float yaw2,
+    float det1_x, float det1_z,
+    float det2_x, float det2_z,
+    float &x, float &z, float &r1, float &r2);
+inline bool from_two_armors(const DetectionResult &det1, const DetectionResult &det2,
+                           RobotState &robot, bool &valid);
+
+
+// ================================ Detection Worker Member Function =============================
 
 using RobotStatePtr = std::shared_ptr<const RobotState>;
 
@@ -56,20 +80,18 @@ void DetectionWorker::operator()() {
         }
         last_cam_ver_ = cur_ver;
 
-        auto cam = std::atomic_load(&shared_.camera);
-        if (!cam) {
+        auto yolo_result = std::atomic_load(&shared_.yolo);
+        imu = std::atomic_load(&shared_.imu);
+        if (!yolo_result || !imu) {
             sleep_small();
             continue;
         }
 
-        // snapshot IMU (ref only)
-        imu = std::atomic_load(&shared_.imu);
-
         // 1) YOLO
-        yolo_predict(cam->raw_data, cam->width, cam->height, dets);
+        //yolo_predict(cam->raw_data, cam->width, cam->height, dets);
 
         // 2) keypoint refine + filtering by confidence
-        refine_keypoints(dets, cam->width, cam->height);
+        refine_keypoints(dets, yolo_result->width, yolo_result->height);
 
         // 3) solvePnP + yaw in cam frame
         solvepnp_and_yaw(dets);
@@ -81,20 +103,21 @@ void DetectionWorker::operator()() {
         // 5) transform to world using latest IMU
         //TODO: considering whether to do pnp first or select robot first
         bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
-        //if success: ...
-        const Eigen::Matrix3f R_world2cam = make_R_cam2world_from_yaw_pitch(imu_yaw, imu_pitch);
-        for (auto &det : selected_armors) {
-            cam2world(det, R_world2cam, imu_yaw, imu_pitch);
-        }
+        if (success) {
+            const Eigen::Matrix3f R_world2cam = make_R_cam2world_from_yaw_pitch(imu_yaw, imu_pitch);
+            for (auto &det : selected_armors) {
+                cam2world(det, R_world2cam, imu_yaw, imu_pitch);
+            }
 
-        // 6) form RobotState
-        auto robot = form_robot(selected_armors);
-        if (robot) {
-            robot->timestamp = cam->timestamp;
-            auto ptr = std::make_shared<RobotState>(*robot);
-            std::atomic_store(&shared_.detection_out, ptr);
-            shared_.detection_ver.fetch_add(1, std::memory_order_relaxed);
-        }
+            // 6) form RobotState
+            auto robot = form_robot(selected_armors);
+            if (robot) {
+                robot->timestamp = yolo_result->timestamp;
+                auto ptr = std::make_shared<RobotState>(*robot);
+                std::atomic_store(&shared_.detection_out, ptr);
+                shared_.detection_ver.fetch_add(1, std::memory_order_relaxed);
+            }
+        }   //TODO: else...
     }
 }
 
@@ -109,69 +132,6 @@ DetectionWorker::yolo_predict(const std::vector<uint8_t> &raw, int w, int h, std
 
 void DetectionWorker::refine_keypoints(std::vector<DetectionResult> &dets, int w, int h) {
     // trad CV refine
-}
-
-static std::array<cv::Point2f, 4>
-order_quad_clockwise(const std::vector<cv::Point2f> &pts)
-{
-    if (pts.size() != 4) {
-        return { cv::Point2f(), cv::Point2f(), cv::Point2f(), cv::Point2f() };
-    }
-
-    std::array<cv::Point2f, 4> out;
-    std::vector<float> sum(4), diff(4);
-
-    for (int i = 0; i < 4; ++i) {
-        sum[i]  = pts[i].x + pts[i].y;
-        diff[i] = pts[i].x - pts[i].y;
-    }
-
-    int tl = std::min_element(sum.begin(), sum.end()) - sum.begin();
-    int br = std::max_element(sum.begin(), sum.end()) - sum.begin();
-    int bl = std::min_element(diff.begin(), diff.end()) - diff.begin();
-    int tr = std::max_element(diff.begin(), diff.end()) - diff.begin();
-
-    out[0] = pts[tl];  // TL
-    out[1] = pts[tr];  // TR
-    out[2] = pts[br];  // BR
-    out[3] = pts[bl];  // BL
-    return out;
-}
-
-static void get_object_points(int armor_type, std::vector<cv::Point3f> &obj_pts)
-{
-    obj_pts.clear();
-
-    float half_w, half_h;
-
-    if (armor_type == 1) {  
-        // big armor
-        half_w = 0.1125f;   // replace with your model
-        half_h = 0.0275f;
-    } else {
-        // small armor
-        half_w = 0.0675f;
-        half_h = 0.0275f;
-    }
-
-    obj_pts.emplace_back(-half_w,  half_h, 0.0f);  // TL
-    obj_pts.emplace_back( half_w,  half_h, 0.0f);  // TR
-    obj_pts.emplace_back( half_w, -half_h, 0.0f);  // BR
-    obj_pts.emplace_back(-half_w, -half_h, 0.0f);  // BL
-}
-
-static float wrap_deg(float a)
-{
-    // wrap angle to (-180, 180]
-    while (a <= -180.0f) a += 360.0f;
-    while (a >   180.0f) a -= 360.0f;
-    return a;
-}
-
-static float angle_diff_deg(float a, float b)
-{
-    // smallest signed difference a - b in (-180, 180]
-    return wrap_deg(a - b);
 }
 
 void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
@@ -218,12 +178,12 @@ void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
         cv::Rodrigues(rvec, R);
 
         // 7. Euler angles from RQDecomp3x3
-        cv::Mat K, R, Qx, Qy, Qz;
+        cv::Mat K_ignore, R_ignore;
         cv::Vec3d euler_angles;
-        cv::RQDecomp3x3(R, K_ignore, R_ignore, Qx, Qy, Qz, euler_angles);
+        euler_angles = cv::RQDecomp3x3(R, K_ignore, R_ignore);
 
         // 8. Yaw angle with optimisation
-        float yaw_deg = static_cast<float>(euler_angles)[1];  // Yaw
+        float yaw_deg = static_cast<float>(euler_angles[1]);  // Yaw
         yaw_deg = wrap_deg(yaw_deg);
 
         if (yaw_deg > 180.0f || yaw_deg < -180.0f) {
@@ -242,7 +202,7 @@ void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
             smoothed_yaw_deg = yaw_deg;
         }
         yaw_smooth_state[key] = smoothed_yaw_deg * M_PI / 180.0f;
-        det.yaw_rad = static_cast<float>(yaw_deg * M_PI / 180.0);
+        det.yaw_rad = static_cast<float>(yaw_deg * M_PI / 180.0f);
     }
 
 }
@@ -282,7 +242,7 @@ void DetectionWorker::select_armor(const std::vector<std::vector<DetectionResult
 
     // CHECK IF CURRENTLY TRACKED ROBOT IS SEEN
     int tracked_idx = -1;
-    for (int i = 0; i < grouped_armors.size(); i++) {
+    for (int i = 0; i < static_cast<int>(grouped_armors.size()); i++) {
         if (grouped_armors[i][0].class_id == selected_robot_id) {
             tracked_idx = i;
             break;
@@ -326,7 +286,7 @@ DetectionWorker::form_robot(const std::vector<DetectionResult> &armors) {
         form_ok = from_two_armors(armors[0], armors[1], prev_robot_, this->has_prev_robot_);
     }
     if (form_ok) {
-        return std::move(rs);
+        return rs;
     }
     if (this->has_prev_robot_) {
         return std::make_unique<RobotState>(prev_robot_);
@@ -335,6 +295,7 @@ DetectionWorker::form_robot(const std::vector<DetectionResult> &armors) {
 }
 
 
+//---------------------------- detection helper -----------------------------//
 
 inline void cam2world(DetectionResult &det, const Eigen::Matrix3f &R_world2cam,
                      const float imu_yaw, const float imu_pitch) {
@@ -347,13 +308,76 @@ inline float tvec_distance(const Eigen::Vector3f& t) {
     return std::sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
 }
 
+static std::array<cv::Point2f, 4>
+order_quad_clockwise(const std::vector<cv::Point2f> &pts)
+{
+    if (pts.size() != 4) {
+        return { cv::Point2f(), cv::Point2f(), cv::Point2f(), cv::Point2f() };
+    }
+
+    std::array<cv::Point2f, 4> out;
+    std::vector<float> sum(4), diff(4);
+
+    for (int i = 0; i < 4; ++i) {
+        sum[i]  = pts[i].x + pts[i].y;
+        diff[i] = pts[i].x - pts[i].y;
+    }
+
+    int tl = std::min_element(sum.begin(), sum.end()) - sum.begin();
+    int br = std::max_element(sum.begin(), sum.end()) - sum.begin();
+    int bl = std::min_element(diff.begin(), diff.end()) - diff.begin();
+    int tr = std::max_element(diff.begin(), diff.end()) - diff.begin();
+
+    out[0] = pts[tl];  // TL
+    out[1] = pts[tr];  // TR
+    out[2] = pts[br];  // BR
+    out[3] = pts[bl];  // BL
+    return out;
+}
+
+inline static void get_object_points(int armor_type, std::vector<cv::Point3f> &obj_pts)
+{
+    obj_pts.clear();
+
+    float half_w, half_h;
+
+    if (armor_type == 1) {  
+        // big armor
+        half_w = 0.1125f;   // replace with your model
+        half_h = 0.0275f;
+    } else {
+        // small armor
+        half_w = 0.0675f;
+        half_h = 0.0275f;
+    }
+
+    obj_pts.emplace_back(-half_w,  half_h, 0.0f);  // TL
+    obj_pts.emplace_back( half_w,  half_h, 0.0f);  // TR
+    obj_pts.emplace_back( half_w, -half_h, 0.0f);  // BR
+    obj_pts.emplace_back(-half_w, -half_h, 0.0f);  // BL
+}
+
+inline static float wrap_deg(float a)
+{
+    // wrap angle to (-180, 180]
+    while (a <= -180.0f) a += 360.0f;
+    while (a >   180.0f) a -= 360.0f;
+    return a;
+}
+
+inline static float angle_diff_deg(float a, float b)
+{
+    // smallest signed difference a - b in (-180, 180]
+    return wrap_deg(a - b);
+}
+
 // Choose robot with minimum average distance of its armors
-int choose_best_robot(const std::vector<std::vector<DetectionResult>>& grouped_armors)
+inline int choose_best_robot(const std::vector<std::vector<DetectionResult>>& grouped_armors)
 {
     int best_idx = 0;
     float best_dist = std::numeric_limits<float>::max();
 
-    for (int i = 0; i < grouped_armors.size(); i++) {
+    for (int i = 0; i < static_cast<int>(grouped_armors.size()); i++) {
         const auto& g = grouped_armors[i];
 
         float avg_dist;
@@ -409,7 +433,7 @@ inline bool from_one_armor(const DetectionResult &det, RobotState &robot, bool &
     return true;
 }
 
-inline bool correct_yaw_to_90(float &yaw1, float &yaw2) {
+inline void correct_yaw_to_90(float &yaw1, float &yaw2) {
     const float mid_point = (yaw1 + yaw2) / 2;
     yaw1 = wrap_pi(mid_point - M_PI_4);
     yaw2 = wrap_pi(mid_point + M_PI_4);
@@ -422,15 +446,14 @@ inline bool solve_linear_sys(
     float &x, float &z, float &r1, float &r2)
 {
     Eigen::Matrix4f A;
-    Eigen::FullPivLU<Eigen::Matrix4f> lu(A);
-    if (lu.rank() < 4) {
-        return false;
-    }
     A << 1, 0, std::sin(yaw1), 0,
          0, 1, -std::cos(yaw1), 0,
          1, 0, 0, std::cos(yaw2),
          0, 1, 0, -std::sin(yaw2);
-
+    Eigen::FullPivLU<Eigen::Matrix4f> lu(A);
+    if (lu.rank() < 4) {
+        return false;
+    }
     Eigen::Vector4f b;
     b << det1_x, det1_z, det2_x, det2_z;
     Eigen::Vector4f solution = A.fullPivLu().solve(b);

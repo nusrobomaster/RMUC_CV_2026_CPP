@@ -77,6 +77,8 @@
         "*.cpp": "cpp",
         "*.hpp": "cpp",
         "shared_mutex": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "expected": "cpp",
+        "cinttypes": "cpp"
     }
 }

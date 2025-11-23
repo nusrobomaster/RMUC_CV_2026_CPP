@@ -96,8 +96,7 @@ void YoloDetector::get_engine(){
     } else {
         // build from ONNX
         IBuilder*            builder = createInferBuilder(gLogger);
-        INetworkDefinition*  network = builder->createNetworkV2(
-            1U << int(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));
+        INetworkDefinition*  network = builder->createNetworkV2(1U << 0);
         IOptimizationProfile* profile = builder->createOptimizationProfile();
         IBuilderConfig*      config  = builder->createBuilderConfig();
 
@@ -107,10 +106,12 @@ void YoloDetector::get_engine(){
             1ull << 30
         );
 
-        IInt8Calibrator*     pCalibrator = nullptr;
         if (bFP16Mode) {
             config->setFlag(BuilderFlag::kFP16);
         }
+#ifdef INT8_MODE
+        IInt8Calibrator*     pCalibrator = nullptr;
+
         if (bINT8Mode) {
             config->setFlag(BuilderFlag::kINT8);
             int batchSize = 8;
@@ -119,6 +120,7 @@ void YoloDetector::get_engine(){
                 calibrationDataPath.c_str(), cacheFile.c_str());
             config->setInt8Calibrator(pCalibrator);
         }
+#endif
 
         nvonnxparser::IParser* parser = nvonnxparser::createParser(*network, gLogger);
         if (!parser->parseFromFile(onnxFile.c_str(), int(gLogger.reportableSeverity))){
@@ -154,9 +156,11 @@ void YoloDetector::get_engine(){
         }
         std::cout << "Succeeded building engine!" << std::endl;
 
+#ifdef INT8_MODE
         if (bINT8Mode && pCalibrator != nullptr){
             delete pCalibrator;
         }
+#endif
 
         // save plan file
         std::ofstream engineFile(trtFile_, std::ios::binary);

@@ -26,7 +26,7 @@ void CameraWorker::operator()() {
 void CameraWorker::grab_frame_stub(CameraFrame &frame) {
     frame.timestamp = Clock::now();
     frame.width  = 640;
-    frame.height = 480;
+    frame.height = 640;
     frame.raw_data.resize(frame.width * frame.height * 3);
     // TODO: fill from real SDK
 }

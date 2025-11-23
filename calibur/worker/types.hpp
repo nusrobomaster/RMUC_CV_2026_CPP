@@ -10,6 +10,7 @@
 #include <opencv2/core.hpp>
 #include <Eigen/Dense>
 
+
 using Clock     = std::chrono::steady_clock;
 using TimePoint = Clock::time_point;
 
@@ -29,10 +30,10 @@ enum StateIdx {
 };
 
 struct CameraFrame {
-    std::vector<uint8_t> raw_data;
-    TimePoint            timestamp;
-    int                  width  = 640;
-    int                  height = 480;
+    cv::Mat      raw_data;
+    TimePoint    timestamp;
+    int          width  = 640;
+    int          height = 640;
 };
 
 struct IMUState {
@@ -42,8 +43,9 @@ struct IMUState {
     TimePoint          timestamp;
 };
 
+
 struct DetectionResult {
-    cv::Rect detection;
+    cv::Rect bbox;
     std::vector<cv::Point2f> keypoints;
 
     int   class_id         = -1;
@@ -54,6 +56,13 @@ struct DetectionResult {
 
     float yaw_rad    = 0.0f;
     int   armor_type = 0;     // 0 = small, 1 = big, etc.
+};
+
+struct YoloOutput {
+    std::vector<DetectionResult>    dets;
+    int                             width;
+    int                             height;
+    TimePoint                       timestamp;
 };
 
 enum PfStateFlag {
@@ -88,6 +97,7 @@ struct SharedLatest {
     std::shared_ptr<RobotState>    detection_out;
     std::shared_ptr<RobotState>    pf_out;
     std::shared_ptr<PredictionOut> prediction_out;
+    std::shared_ptr<YoloOutput> yolo;
 
     // Version counters (increment per new publish)
     std::atomic<uint64_t> camera_ver     {0};
@@ -95,6 +105,7 @@ struct SharedLatest {
     std::atomic<uint64_t> detection_ver  {0};
     std::atomic<uint64_t> pf_ver         {0};
     std::atomic<uint64_t> prediction_ver {0};
+    std::atomic<uint64_t> yolo_ver{0};
 };
 
 struct SharedScalars {

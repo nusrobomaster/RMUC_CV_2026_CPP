@@ -9,6 +9,21 @@
 #include "workers.hpp"
 #include "helper.hpp"
 
+// ===================== Helper Function Prototype Declaration =========================
+
+inline void filtering(float &value, float measurement, float alpha);
+inline bool is_converged(float v, float threshold);
+inline float t_lead_calculation(const Eigen::Vector3f &tvec, const float &bullet_speed);
+inline int sector_from_yaw(const float yaw);
+inline void calculate_robot_final_target_point(Eigen::Vector3f &final_pos, float &final_yaw,
+                                        const float height_offset, const float r1, const float r2);
+inline void motion_model_robot_pos(const std::array<float, ROBOT_STATE_VEC_LEN> &state, 
+                                    Eigen::Vector3f &robot_center_lead, float &yaw_lead, const float &t);
+inline void calculate_gimbal_correction(const Eigen::Vector3f &tvec, Eigen::Vector2f &correction);
+inline int should_fire(const Eigen::Vector3f &tvec);
+
+
+// ===================== Prediction Worker Member Functions ============================
 
 PredictionWorker::PredictionWorker(SharedLatest &shared,
                     SharedScalars &scalars,
@@ -96,26 +111,27 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
 
     // --- world2cam using imu yaw/pitch ---
     bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
-    //if success: ...
-    Eigen::Matrix3f R_world2cam = make_R_world2cam_from_yaw_pitch(imu_yaw, imu_pitch);
-    tvec = R_world2cam * tvec;
-    yaw_lead = yaw_lead - imu_yaw;    // + initial_yaw?
-    calculate_robot_final_target_point(pos_lead, yaw_lead, state[14], state[12], state[13]);
+    if (success) {
+        Eigen::Matrix3f R_world2cam = make_R_world2cam_from_yaw_pitch(imu_yaw, imu_pitch);
+        tvec = R_world2cam * tvec;
+        yaw_lead = yaw_lead - imu_yaw;    // + initial_yaw?
+        calculate_robot_final_target_point(pos_lead, yaw_lead, state[14], state[12], state[13]);
 
-    // --- bullet drop correction ---
-    const float t_bullet_travel = (t_lead - this->t_gimbal_actuation - processing_time);
-    const float drop_correction = 0.5f * 9.81f * t_bullet_travel * t_bullet_travel;
-    pos_lead[1] += drop_correction;
+        // --- bullet drop correction ---
+        const float t_bullet_travel = (t_lead - this->t_gimbal_actuation - processing_time);
+        const float drop_correction = 0.5f * 9.81f * t_bullet_travel * t_bullet_travel;
+        pos_lead[1] += drop_correction;
 
-    calculate_gimbal_correction(pos_lead, correction);
-    const bool fire_state  = should_fire(pos_lead);
-    
-    const bool chase_state = (pos_lead[2] > CHASE_THREASHOLD);
-    const bool aim_state   = true;  // TODO: hook to PF state machine
+        calculate_gimbal_correction(pos_lead, correction);
+        const bool fire_state  = should_fire(pos_lead);
+        
+        const bool chase_state = (pos_lead[2] > CHASE_THREASHOLD);
+        const bool aim_state   = true;  // TODO: hook to PF state machine
 
-    this->fire_state  = fire_state;
-    this->chase_state = chase_state;
-    this->aim_state   = aim_state;
+        this->fire_state  = fire_state;
+        this->chase_state = chase_state;
+        this->aim_state   = aim_state;
+    }   //TODO: else...
 }
 
 inline void filtering(float &value, float measurement, float alpha) {

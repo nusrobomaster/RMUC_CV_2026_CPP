@@ -1,29 +1,34 @@
-cmake_minimum_required(VERSION 3.5)
-project(calibur_worker LANGUAGES CXX)
+# calibur/worker/CMakeLists.txt
 
-# Collect all .cpp files in this directory (your 5 worker cpp files)
-file(GLOB WORKER_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+set(WORKER_SOURCES
+    camera_worker.cpp
+    detection_worker.cpp
+    imu_worker.cpp
+    pf_worker.cpp
+    prediction_worker.cpp
+    usb_worker.cpp
+    yolo_worker.cpp
+    helper.hpp
+    thread_pool.hpp
+    types.hpp
+    workers.hpp
 )
 
-add_library(calibur_worker STATIC
+add_library(calibur_worker_core STATIC
     ${WORKER_SOURCES}
 )
 
-target_include_directories(calibur_worker PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(calibur_worker_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/calibur
+        ${CMAKE_SOURCE_DIR}/calibur/pose/include
+        ${CMAKE_SOURCE_DIR}/calibur/pf
 )
 
-# Particle filter library from calibur/pf
-target_link_libraries(calibur_worker
+target_link_libraries(calibur_worker_core
     PUBLIC
-        calibur_pf
-)
-
-# Eigen
-find_package(Eigen3 REQUIRED)
-
-target_link_libraries(calibur_worker
-    PUBLIC
-        Eigen3::Eigen
+        calibur_deps     # OpenCV + Eigen + yaml-cpp + CUDA + platform
+        yolo_pose     # from calibur/pose
+        calibur_pf       # from calibur/pf
 )

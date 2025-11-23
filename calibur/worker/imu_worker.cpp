@@ -1,5 +1,5 @@
 #include "types.hpp"
-#include "workers.hpp"a
+#include "workers.hpp"
 
 
 IMUWorker::IMUWorker(SharedLatest &shared,
