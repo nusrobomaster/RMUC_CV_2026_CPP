@@ -131,7 +131,8 @@ void preprocess(const cv::Mat& srcImg, float* dstDevData, const int dstHeight, c
 
     // letterbox and resize
     letterbox<<<gridSize, blockSize, 0, stream>>>(srcDevData, srcHeight, srcWidth, midDevData, dstHeight, dstWidth, h, w, y, x);
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
     // hwc to chw / bgr to rgb / normalize
     process<<<gridSize, blockSize, 0, stream>>>(midDevData, dstDevData, dstHeight, dstWidth);
 

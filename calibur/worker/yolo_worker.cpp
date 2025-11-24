@@ -12,7 +12,7 @@ YoloWorker::YoloWorker(SharedLatest& shared,
                        const std::string& engine_path)
     : shared_(shared),
       stop_(stop_flag),
-      detector_("calibur/models/yolo11-pose3.engine")          // <-- construct member here
+      detector_(engine_path)          // <-- construct member here
 {}
 
 void YoloWorker::operator()() {
@@ -32,8 +32,18 @@ void YoloWorker::operator()() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
+#ifdef PERFORMANCE_BENCHMARK
+        auto t0 = std::chrono::high_resolution_clock::now();
 
         std::vector<Detection> yolo_dets = detector_.inference(cam->raw_data);
+
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double infer_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+        std::cout << "[YOLO] inference time = " << infer_ms << " ms\n";
+#else
+        std::vector<Detection> yolo_dets = detector_.inference(cam->raw_data);
+#endif
 
         dets.clear();
         dets.reserve(yolo_dets.size());
@@ -42,7 +52,12 @@ void YoloWorker::operator()() {
             parse_detection_result(d, r);
             dets.emplace_back(r);
         }
-
+#ifdef DISPLAY_DETECTION
+        cv::Mat img = cam->raw_data.clone(); 
+        YoloDetector::draw_image(img, yolo_dets, true, false);
+        cv::imshow("YOLO Pose", img);
+        cv::waitKey(1); 
+#endif
         // ---- 4) publish YOLO output ----
         auto yo = std::make_shared<YoloOutput>();
         yo->dets      = dets;           // or std::move(dets) if you don’t reuse

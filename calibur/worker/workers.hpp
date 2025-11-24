@@ -12,11 +12,14 @@
 
 // ------------------------------------------- Constants -------------------------------------------
 // ------------- File Paths ------------------------
-const std::string YOLO_MODEL_PATH   = "calibur/models/yolo11-pose3.onnx";
-const std::string VIDEO_PATH        = "sample_videos/video1.mp4";
+const std::string YOLO_MODEL_PATH   = "../calibur/models/best.engine";  //relative to the binary executable
+const std::string VIDEO_PATH        = "../sample_videos/video1.mp4";
+// const std::string kOnnxPath         = "../calibur/models/best.onnx";
 
 // ------------- Camera Worker ---------------------
 #define USE_VIDEO_FILE
+#define DISPLAY_DETECTION
+#define PERFORMANCE_BENCHMARK
 
 // ------------- Detection Constants ---------------
 #define YOLO_CONFIDENCE_THRESHOLD               0.5f
@@ -26,6 +29,7 @@ const std::string VIDEO_PATH        = "sample_videos/video1.mp4";
 #define SELECTOR_TTL                            0.5f    // seconds
 
 // ------------- PF constants ----------------------
+// #define PF_CONDITIONAL_RESAMPLE                
 static constexpr int NUM_PARTICLES = 10000;
 
 
@@ -163,7 +167,8 @@ private:
 
 
 //--------------------------------------------PF Worker--------------------------------------------
-struct RBPFPosYawModelGPU; 
+struct RBPFPosYawModelGPU;
+
 class PFWorker {
 public:
     PFWorker(SharedLatest &shared,
@@ -172,20 +177,28 @@ public:
     // Runs as dedicated thread (not via pool)
     void operator()();
 
+    PFWorker(const PFWorker&) = delete;
+    PFWorker& operator=(const PFWorker&) = delete;
+    PFWorker(PFWorker&&) = default;
+    PFWorker& operator=(PFWorker&&) = default;
+
 private:
     static constexpr float kDt = 0.01f;
-    SharedLatest    &shared_;
+    SharedLatest      &shared_;
     std::atomic<bool> &stop_;
-    uint64_t        last_det_ver_;
+    uint64_t           last_det_ver_ = 0;
 
-    RBPFPosYawModelGPU *g_pf = nullptr;
+    // Heap-allocated PF model
+    std::unique_ptr<RBPFPosYawModelGPU> g_pf;
 
     // PF / CUDA interfaces to implement in .cpp
     void gpu_pf_init();
     void gpu_pf_reset(const RobotState &meas);
-    RobotState gpu_pf_predict_only();
-    RobotState gpu_pf_step(const RobotState &meas);
+    void gpu_pf_predict_only();
+    void gpu_pf_step(const RobotState &meas);
+    RobotState gpu_return_result();
 };
+
 
 //--------------------------------------------Prediction Worker--------------------------------------------
 

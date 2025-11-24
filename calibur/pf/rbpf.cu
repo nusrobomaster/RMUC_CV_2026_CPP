@@ -5,6 +5,20 @@
 #include <cstdio>
 #include "rbpf.cuh"
 
+// #define CHECK(call) check(call, __LINE__, __FILE__)
+
+// inline bool check(cudaError_t e, int iLine, const char *szFile)
+// {
+//     if (e != cudaSuccess)
+//     {
+//         std::cout << "CUDA runtime API error " << cudaGetErrorName(e) << " at line " << iLine << " in file " << szFile << std::endl;
+//         return false;
+//     }
+//     return true;
+// }
+
+
+
 
 
 __host__ RBPFParams default_params() {
@@ -53,6 +67,39 @@ __device__ inline float wrap_to_pi(float a) {
 
 __device__ float gaussian(curandState *state) {
     return curand_normal(state);
+}
+
+__global__ void broadcast_X0_kernel(float* X, int N, int D) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= N * D) return;
+
+    int j = idx % D;
+    X[idx] = X[j];  // copy from first particle's state
+}
+
+__global__ void compute_ess_kernel(const float* w, int N, float* out_ess_inv) {
+    __shared__ float buf[256];
+    int tid = threadIdx.x;
+
+    float local = 0.0f;
+    for (int i = tid; i < N; i += blockDim.x) {
+        float wi = w[i];
+        local += wi * wi;
+    }
+    buf[tid] = local;
+
+    __syncthreads();
+
+    // reduce inside block
+    for (int stride = blockDim.x/2; stride > 0; stride >>= 1) {
+        if (tid < stride)
+            buf[tid] += buf[tid + stride];
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        *out_ess_inv = buf[0];
+    }
 }
 
 // ======================= KERNELS =========================
@@ -354,24 +401,59 @@ __global__ void kf_update_kernel(
     Xi[IDX_H]  = mean[6];
 }
 
-__global__ void mean_kernel(const float *X, int N, float *out_mean) {
-    __shared__ float buf[D];
+template<int D>
+__global__ void mean_kernel(const float* __restrict__ X,
+                                  int N,
+                                  float* __restrict__ out_mean)
+{
+    extern __shared__ float sdata[]; // size = blockDim.x * D
     int tid = threadIdx.x;
 
-    if (tid < D) buf[tid] = 0.0f;
-    __syncthreads();
+    // 1) Per-thread accumulators in registers (float)
+    float acc[D];
+    #pragma unroll
+    for (int k = 0; k < D; ++k) {
+        acc[k] = 0.0f;
+    }
 
-    // simple striped accumulation
+    // 2) Striped accumulation over N (no atomics, all float)
     for (int idx = tid; idx < N; idx += blockDim.x) {
-        const float *Xi = &X[idx * D];
+        const float* Xi = X + idx * D;  // Xi[0..D-1] are float
+        #pragma unroll
         for (int k = 0; k < D; ++k) {
-            atomicAdd(&buf[k], Xi[k]);
+            acc[k] += Xi[k];
         }
     }
 
+    // 3) Store per-thread partials into shared memory (float)
+    float* srow = &sdata[tid * D];
+    #pragma unroll
+    for (int k = 0; k < D; ++k) {
+        srow[k] = acc[k];
+    }
     __syncthreads();
-    if (tid < D) {
-        out_mean[tid] = buf[tid] / float(N);
+
+    // 4) Parallel reduction across threads in the block (float)
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            float* srow_dst = &sdata[tid * D];
+            float* srow_src = &sdata[(tid + stride) * D];
+            #pragma unroll
+            for (int k = 0; k < D; ++k) {
+                srow_dst[k] += srow_src[k];
+            }
+        }
+        __syncthreads();
+    }
+
+    // 5) Thread 0 writes means (float)
+    if (tid == 0) {
+        float invN = 1.0f / float(N);
+        float* srow0 = &sdata[0];
+        #pragma unroll
+        for (int k = 0; k < D; ++k) {
+            out_mean[k] = srow0[k] * invN;
+        }
     }
 }
 
@@ -395,7 +477,7 @@ RBPFPosYawModelGPU::RBPFPosYawModelGPU(int N_, const RBPFParams &p)
     size_t szCDF     = N        * sizeof(float);
     size_t szMeanVec = D        * sizeof(float);
 
-    cudaStreamCreate(&stream);
+    CHECK(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, 1));
 
     cudaMalloc(&dev.X,          szX);
     cudaMalloc(&dev.kf_mean,    szMean);
@@ -410,6 +492,15 @@ RBPFPosYawModelGPU::RBPFPosYawModelGPU(int N_, const RBPFParams &p)
     cudaMalloc(&d_W,      szW);
     cudaMalloc(&d_cdf,    szCDF);
     cudaMalloc(&d_mean,   szMeanVec);
+    cudaMalloc(&d_max, sizeof(float));
+    cudaMalloc(&d_sum, sizeof(float));
+
+    cudaMalloc(&X_new,     szX);
+    cudaMalloc(&kf_new,    szMean);
+    cudaMalloc(&Pvel_new,  szPvel);
+    cudaMalloc(&Pgeom_new, szPgeom);
+
+    cudaMalloc(&d_ess_inv, sizeof(float));
 
     // init RNG
     int block = CUDA_BLOCK_SIZE;
@@ -441,14 +532,49 @@ RBPFPosYawModelGPU::~RBPFPosYawModelGPU() {
     cudaFree(d_mean);
     cudaFree(d_obs);
     cudaFree(d_cdf);
+    cudaFree(d_max);
+    cudaFree(d_sum);
+    cudaFree(X_new);
+    cudaFree(kf_new);
+    cudaFree(Pvel_new);
+    cudaFree(Pgeom_new);
+
+    cudaFree(d_ess_inv);
 
     cudaStreamDestroy(stream);
 }
 
 
 void RBPFPosYawModelGPU::set_state_from_host(const float *h_X) {
-    cudaMemcpyAsync(dev.X, h_X, N * D * sizeof(float),
-                    cudaMemcpyHostToDevice, stream);
+    std::fprintf(stderr,
+        "[RBPF] set_state_from_host: N=%d D=%d size=%zu h_X=%p dev.X=%p stream=%p\n",
+        N, D, size_t(N) * D * sizeof(float),
+        (const void*)h_X, (void*)dev.X, (void*)stream);
+    std::fflush(stderr);
+
+    cudaPointerAttributes attrHost{};
+    cudaError_t a1 = cudaPointerGetAttributes(&attrHost, h_X);
+    std::fprintf(stderr,
+        "  h_X attrs: err=%d type=%d device=%d\n",
+        (int)a1, (int)attrHost.type, (int)attrHost.device);
+
+    cudaPointerAttributes attrDev{};
+    cudaError_t a2 = cudaPointerGetAttributes(&attrDev, dev.X);
+    std::fprintf(stderr,
+        "  dev.X attrs: err=%d type=%d device=%d\n",
+        (int)a2, (int)attrDev.type, (int)attrDev.device);
+    std::fflush(stderr);
+
+    // Quick sanity on content
+    int max_print = std::min(N * D, 8);
+    for (int i = 0; i < max_print; ++i) {
+        std::fprintf(stderr, "  h_X[%d] = %f\n", i, h_X[i]);
+    }
+    std::fflush(stderr);
+
+    CHECK(cudaMemcpyAsync(dev.X, h_X,
+                               N * D * sizeof(float),
+                               cudaMemcpyHostToDevice, stream));
 }
 
 void RBPFPosYawModelGPU::predict_device(float dt) {
@@ -480,18 +606,41 @@ void RBPFPosYawModelGPU::kf_update_device(
 }
 
 void RBPFPosYawModelGPU::mean_device() {
-    int block = D;  // e.g. 32
+    int block = 256;  // e.g. 32
     int grid  = 1;
-    mean_kernel<<<grid, block, 0, stream>>>(dev.X, N, d_mean);
+    size_t shared_mem = block * D * sizeof(float);
+    mean_kernel<D><<<grid, block, shared_mem, stream>>>(dev.X, N, d_mean);
 }
+
+void RBPFPosYawModelGPU::set_state_single(const float *X0) {
+    // copy X0 only
+    CHECK(cudaMemcpyAsync(dev.X, X0, D * sizeof(float),
+                               cudaMemcpyHostToDevice, stream));
+
+    // broadcast to all particles
+    int total = N * D;
+    int block = 256;
+    int grid = (total + block - 1) / block;
+
+    broadcast_X0_kernel<<<grid, block, 0, stream>>>(dev.X, N, D);
+}
+
 
 // ======================= C API WRAPPERS ====================
 
+inline void build_X0_from_meas(const RobotState &meas, float *X0) {
+    for (int i = 0; i < ROBOT_STATE_VEC_LEN; i++) {
+        X0[i] = meas.state[i];
+    }
+}
 
 // Map RobotState -> obs[15]
 static inline void robotStateToObs(const RobotState &meas, float *z) {
     // fill z[0..14] from meas.tvec, meas.vel, meas.acc, meas.yaw, omega, alpha, r1,r2,h
     // TODO: implement based on your RobotState layout
+    for (int i = 0; i < ROBOT_STATE_VEC_LEN; i++){
+        z[i] = meas.state[i];
+    }
 }
 
 RBPFPosYawModelGPU *rbpf_create(int N) {
@@ -508,9 +657,12 @@ void rbpf_predict(RBPFPosYawModelGPU *pf, float dt) {
 
 void rbpf_reset_from_meas(RBPFPosYawModelGPU *pf, const RobotState &meas) {
     float X0[D];
-    // TODO: build initial state X0 from meas and copy with set_state_from_host
-    pf->set_state_from_host(X0);
+    for (int i = 0; i < ROBOT_STATE_VEC_LEN; ++i)
+        X0[i] = meas.state[i];
+
+    pf->set_state_single(X0);
 }
+
 
 void rbpf_step(RBPFPosYawModelGPU *pf, const RobotState &meas, float dt) {
     // 1) H2D: obs (only transfer this)
@@ -519,19 +671,37 @@ void rbpf_step(RBPFPosYawModelGPU *pf, const RobotState &meas, float dt) {
     cudaMemcpyAsync(pf->d_obs, h_obs, D*sizeof(float),
                     cudaMemcpyHostToDevice, pf->stream);
 
-    //int block = CUDA_BLOCK_SIZE;
-    //int grid  = (pf->N + block - 1) / block;
-
-    // 2) predict
     pf->predict_device(dt);
-
-    // 3) loglik
     pf->loglik_device();
 
     // 4) update + normalize weights, resample (device-only; TODO implement)
-    gpu_update_and_normalize_weights(pf->d_loglik, pf->d_W, pf->N, pf->stream);
-    gpu_resample_particles(pf->dev, pf->d_W, pf->d_cdf, pf->N, pf->stream);
+    gpu_update_and_normalize_weights(pf->d_loglik, pf->d_W, pf->N, pf->d_max, pf->d_sum, pf->d_ess_inv, pf->stream);
+
+#ifdef PF_CONDITIONAL_RESAMPLE
+    float ess_inv;
+    cudaMemcpyAsync(&ess_inv, pf->d_ess_inv, sizeof(float),
+                    cudaMemcpyDeviceToHost, pf->stream);
+    cudaStreamSynchronize(pf->stream);
+
+    float ESS = 1.0f / ess_inv;
+
+    // Only resample if necessary
+    if (ESS < pf->N * 0.5f) {
+        gpu_resample_particles(
+            pf->dev, pf->d_W, pf->d_cdf,
+            pf->X_new, pf->kf_new, pf->Pvel_new, pf->Pgeom_new,
+            pf->N, pf->stream);
+
+        gpu_set_uniform_weights(pf->d_W, pf->N, pf->stream);
+    }
+#else
+    gpu_resample_particles(
+            pf->dev, pf->d_W, pf->d_cdf,
+            pf->X_new, pf->kf_new, pf->Pvel_new, pf->Pgeom_new,
+            pf->N, pf->stream);
+
     gpu_set_uniform_weights(pf->d_W, pf->N, pf->stream);
+#endif
 
     // 5) KF update – compute y_obs, R_obs on host
     bool  have_yaw_obs = false;
@@ -721,34 +891,23 @@ void gpu_update_and_normalize_weights(
         const float *d_loglik,
         float *d_W,
         int N,
+        float *d_max,
+        float *d_sum,
+        float *d_ess_inv,
         cudaStream_t stream)
 {
-    // scratch scalars on device
-    float *d_max = nullptr;
-    float *d_sum = nullptr;
-    cudaMalloc(&d_max, sizeof(float));
-    cudaMalloc(&d_sum, sizeof(float));
-
     init_max_sum_kernel<<<1, 1, 0, stream>>>(d_max, d_sum);
 
     int block = CUDA_BLOCK_SIZE;
     int grid  = (N + block - 1) / block;
 
-    // 1) compute logw and global max logw
-    compute_logw_and_max_kernel<<<grid, block, 0, stream>>>(
-        d_loglik, d_W, N, d_max);
+    compute_logw_and_max_kernel<<<grid, block, 0, stream>>>(d_loglik, d_W, N, d_max);
+    exp_and_sum_kernel<<<grid, block, 0, stream>>>(d_W, N, d_max, d_sum);
+    normalize_weights_kernel<<<grid, block, 0, stream>>>(d_W, N, d_sum);
 
-    // 2) exponentiate and accumulate sum
-    exp_and_sum_kernel<<<grid, block, 0, stream>>>(
-        d_W, N, d_max, d_sum);
-
-    // 3) normalize weights
-    normalize_weights_kernel<<<grid, block, 0, stream>>>(
-        d_W, N, d_sum);
-
-    cudaFree(d_max);
-    cudaFree(d_sum);
+    compute_ess_kernel<<<1, 256, 0, stream>>>(d_W, N, d_ess_inv);
 }
+
 void gpu_set_uniform_weights(float *d_W, int N, cudaStream_t stream) {
     int block = CUDA_BLOCK_SIZE;
     int grid  = (N + block - 1) / block;
@@ -759,6 +918,10 @@ void gpu_resample_particles(
         RBPFDevice dev,
         float *d_W,
         float *d_cdf,
+        float *X_new,
+        float *kf_new,
+        float *Pvel_new,
+        float *Pgeom_new,
         int N,
         cudaStream_t stream)
 {
@@ -770,16 +933,6 @@ void gpu_resample_particles(
     size_t szMean  = size_t(N) * KF_D * sizeof(float);
     size_t szPvel  = size_t(N) * 4    * sizeof(float);
     size_t szPgeom = size_t(N) * 3    * sizeof(float);
-
-    float *X_new     = nullptr;
-    float *kf_new    = nullptr;
-    float *Pvel_new  = nullptr;
-    float *Pgeom_new = nullptr;
-
-    cudaMalloc(&X_new,     szX);
-    cudaMalloc(&kf_new,    szMean);
-    cudaMalloc(&Pvel_new,  szPvel);
-    cudaMalloc(&Pgeom_new, szPgeom);
 
     int block = CUDA_BLOCK_SIZE;
     int grid  = (N + block - 1) / block;
@@ -797,12 +950,6 @@ void gpu_resample_particles(
                     cudaMemcpyDeviceToDevice, stream);
     cudaMemcpyAsync(dev.P_geom_diag,Pgeom_new, szPgeom,
                     cudaMemcpyDeviceToDevice, stream);
-
-    // 5) cleanup
-    cudaFree(X_new);
-    cudaFree(kf_new);
-    cudaFree(Pvel_new);
-    cudaFree(Pgeom_new);
 }
 
 

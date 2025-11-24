@@ -94,11 +94,21 @@ struct RBPFPosYawModelGPU {
     RBPFParams params;
     RBPFDevice dev;
 
-    float *d_W;      // [N] weights
-    float *d_loglik; // [N]
-    float *d_mean;   // [D]
-    float *d_obs;    // [D]
-    float *d_cdf;    // [N]
+    float *d_W;
+    float *d_loglik;
+    float *d_mean;
+    float *d_obs;
+    float *d_cdf;
+
+    // scratch
+    float *d_max = nullptr;
+    float *d_sum = nullptr;
+    float *X_new = nullptr;
+    float *kf_new = nullptr;
+    float *Pvel_new = nullptr;
+    float *Pgeom_new = nullptr;
+
+    float *d_ess_inv = nullptr;
 
     float z_yaw_prev;
     cudaStream_t stream;
@@ -109,6 +119,7 @@ struct RBPFPosYawModelGPU {
 
     // host->device state init
     void set_state_from_host(const float *h_X);
+    void set_state_single(const float *X0);
 
     // device-side steps (no host pointers)
     void predict_device(float dt);
@@ -132,11 +143,18 @@ void gpu_update_and_normalize_weights(
         const float *d_loglik,
         float *d_W,
         int N,
+        float *d_max,
+        float *d_sum,
+        float *d_ess_inv,
         cudaStream_t stream);
 void gpu_set_uniform_weights(float *d_W, int N, cudaStream_t stream);
 void gpu_resample_particles(
         RBPFDevice dev,
         float *d_W,
         float *d_cdf,
+        float *X_new,
+        float *kf_new,
+        float *Pvel_new,
+        float *Pgeom_new,
         int N,
         cudaStream_t stream);

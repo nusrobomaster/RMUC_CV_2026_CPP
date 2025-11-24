@@ -52,7 +52,7 @@ void CameraWorker::operator()() {
         shared_.camera_ver.fetch_add(1, std::memory_order_relaxed);
 
         // Optional: throttle loop if needed (e.g., std::this_thread::sleep_for)
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
 #ifdef USE_VIDEO_FILE

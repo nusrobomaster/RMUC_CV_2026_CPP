@@ -16,14 +16,18 @@ using namespace nvinfer1;
 class YoloDetector
 {
 public:
-    explicit YoloDetector(const std::string trtFile);
+    explicit YoloDetector(const std::string& trtFile);
     ~YoloDetector();
+
     YoloDetector(const YoloDetector&) = delete;
     YoloDetector& operator=(const YoloDetector&) = delete;
-    YoloDetector(YoloDetector&&) = default;
-    YoloDetector& operator=(YoloDetector&&) = default;
+
+    // CUSTOM move semantics
+    YoloDetector(YoloDetector&& other) noexcept;
+    YoloDetector& operator=(YoloDetector&& other) noexcept;
 
     std::vector<Detection> inference(cv::Mat& img);
+    bool is_valid() const { return valid_; }
 
     static void draw_image(
         cv::Mat& img,
@@ -51,6 +55,7 @@ private:
     float*              decodeDevice    = nullptr;
 
     int                 OUTPUT_CANDIDATES = 0;  // 8400: 80*80 + 40*40 + 20*20
+    bool                valid_ = false;
 };
 
 #endif  // INFER_H

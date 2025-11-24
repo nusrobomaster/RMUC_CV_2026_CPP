@@ -11,13 +11,13 @@
 
 using namespace nvinfer1;
 
-YoloDetector::YoloDetector(const std::string trtFile)
+YoloDetector::YoloDetector(const std::string& trtFile)
     : trtFile_(trtFile)
 {
     gLogger = Logger(ILogger::Severity::kERROR);
     cudaSetDevice(kGpuId);
 
-    CHECK(cudaStreamCreate(&stream));
+    CHECK(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, 0));
 
     // load or build engine
     get_engine();
@@ -107,7 +107,7 @@ void YoloDetector::get_engine(){
         );
 
         if (bFP16Mode) {
-            config->setFlag(BuilderFlag::kFP16);
+            config->setFlag(nvinfer1::BuilderFlag::kFP16);
         }
 #ifdef INT8_MODE
         IInt8Calibrator*     pCalibrator = nullptr;
@@ -123,7 +123,7 @@ void YoloDetector::get_engine(){
 #endif
 
         nvonnxparser::IParser* parser = nvonnxparser::createParser(*network, gLogger);
-        if (!parser->parseFromFile(onnxFile.c_str(), int(gLogger.reportableSeverity))){
+        if (!parser->parseFromFile(kOnnxPath.c_str(), int(gLogger.reportableSeverity))){
             std::cout << "Failed parsing .onnx file!" << std::endl;
             for (int i = 0; i < parser->getNbErrors(); ++i){
                 auto* error = parser->getError(i);
@@ -175,23 +175,74 @@ void YoloDetector::get_engine(){
     }
 }
 
-YoloDetector::~YoloDetector(){
-    cudaStreamDestroy(stream);
+YoloDetector::~YoloDetector() {
+    if (stream) {
+        cudaStreamDestroy(stream);
+        stream = nullptr;
+    }
 
-    for (int i = 0; i < 2; ++i){
-        if (vBufferD[i]) {
-            CHECK(cudaFree(vBufferD[i]));
+    // Safely free device buffers
+    for (void*& ptr : vBufferD) {
+        if (ptr) {
+            cudaFree(ptr);
+            ptr = nullptr;
         }
     }
 
-    if (transposeDevice) CHECK(cudaFree(transposeDevice));
-    if (decodeDevice)    CHECK(cudaFree(decodeDevice));
+    if (transposeDevice) {
+        cudaFree(transposeDevice);
+        transposeDevice = nullptr;
+    }
+    if (decodeDevice) {
+        cudaFree(decodeDevice);
+        decodeDevice = nullptr;
+    }
 
     delete[] outputData;
+    outputData = nullptr;
 
-    delete context;
-    delete engine;
-    delete runtime;
+    // TensorRT objects must be destroyed with destroy(), not delete
+    if (context) { delete context; context = nullptr; }
+    if (engine)  { delete engine;  engine = nullptr; }
+    if (runtime) { delete runtime; runtime = nullptr; }
+
+}
+
+YoloDetector::YoloDetector(YoloDetector&& other) noexcept
+    : gLogger(other.gLogger),
+      trtFile_(std::move(other.trtFile_)),
+      engine(other.engine),
+      runtime(other.runtime),
+      context(other.context),
+      stream(other.stream),
+      outputData(other.outputData),
+      vBufferD(std::move(other.vBufferD)),
+      transposeDevice(other.transposeDevice),
+      decodeDevice(other.decodeDevice),
+      OUTPUT_CANDIDATES(other.OUTPUT_CANDIDATES),
+      valid_(other.valid_)
+{
+    other.engine = nullptr;
+    other.runtime = nullptr;
+    other.context = nullptr;
+    other.stream = nullptr;
+    other.outputData = nullptr;
+    other.transposeDevice = nullptr;
+    other.decodeDevice = nullptr;
+    other.vBufferD.clear();
+    other.OUTPUT_CANDIDATES = 0;
+    other.valid_ = false;
+}
+
+// Move assignment: destroy current, then move-construct in place
+YoloDetector& YoloDetector::operator=(YoloDetector&& other) noexcept {
+    if (this != &other) {
+        // Explicitly call destructor on *this*
+        this->~YoloDetector();
+        // Placement-new to reuse this memory with move-constructed object
+        new (this) YoloDetector(std::move(other));
+    }
+    return *this;
 }
 
 std::vector<Detection> YoloDetector::inference(cv::Mat& img){
@@ -213,8 +264,8 @@ std::vector<Detection> YoloDetector::inference(cv::Mat& img){
     context->setInputTensorAddress(inputName,  vBufferD[0]);
     context->setOutputTensorAddress(outputName, vBufferD[1]);
 
-    // enqueueV3 replaces enqueueV2
     context->enqueueV3(stream);
+    // enqueueV3 replaces enqueueV2
 
     // transpose [1, 56, 8400] -> [1, 8400, 56]
     transpose(
@@ -253,11 +304,8 @@ std::vector<Detection> YoloDetector::inference(cv::Mat& img){
 
     std::vector<Detection> vDetections;
     float *outPtr = outputData;
-    for (int i = 0; i < 50; i++){
-        std::cout << outPtr[i] << " ";
-    }
     int count = std::min((int)outputData[0], kMaxNumOutputBbox);
-    std::cout << "Total kept boxes after NMS: " << count << std::endl;
+    //std::cout << "Total kept boxes after NMS: " << count << std::endl;
     for (int i = 0; i < count; i++){
         int pos      = 1 + i * kNumBoxElement;
         int keepFlag = (int)outputData[pos + 6];
@@ -319,12 +367,10 @@ void YoloDetector::draw_image(
         cv::Scalar kptColor(get_random_int(), get_random_int(), get_random_int());
 
         std::vector<std::vector<float>> vScaledKpts = inferResult[j].vKpts;
-        std::cout << "Number of keypoints: " << vScaledKpts.size() << std::endl;
         for (size_t k = 0; k < vScaledKpts.size(); k++){
             int   x    = (int)vScaledKpts[k][0];
             int   y    = (int)vScaledKpts[k][1];
             float conf = vScaledKpts[k][2];
-            std::cout << "Keypoint " << k << ": (" << x << ", " << y << "), conf=" << conf << std::endl;
             if (x < 0 || x > img.cols || y < 0 || y > img.rows) continue;
             if (conf < 0.5f) continue;
             cv::circle(img, cv::Point(x, y), radius, kptColor, -1);
