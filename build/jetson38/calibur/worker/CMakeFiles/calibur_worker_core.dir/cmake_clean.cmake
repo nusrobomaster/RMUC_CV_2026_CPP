@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/calibur_worker_core.dir/camera_worker.cpp.o.d"
   "CMakeFiles/calibur_worker_core.dir/detection_worker.cpp.o"
   "CMakeFiles/calibur_worker_core.dir/detection_worker.cpp.o.d"
+  "CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o"
+  "CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o.d"
   "CMakeFiles/calibur_worker_core.dir/imu_worker.cpp.o"
   "CMakeFiles/calibur_worker_core.dir/imu_worker.cpp.o.d"
   "CMakeFiles/calibur_worker_core.dir/pf_worker.cpp.o"

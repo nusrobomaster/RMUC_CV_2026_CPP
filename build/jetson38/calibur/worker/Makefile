@@ -178,6 +178,30 @@ detection_worker.cpp.s:
 	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38 && $(MAKE) $(MAKESILENT) -f calibur/worker/CMakeFiles/calibur_worker_core.dir/build.make calibur/worker/CMakeFiles/calibur_worker_core.dir/detection_worker.cpp.s
 .PHONY : detection_worker.cpp.s
 
+display_worker.o: display_worker.cpp.o
+.PHONY : display_worker.o
+
+# target to build an object file
+display_worker.cpp.o:
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38 && $(MAKE) $(MAKESILENT) -f calibur/worker/CMakeFiles/calibur_worker_core.dir/build.make calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o
+.PHONY : display_worker.cpp.o
+
+display_worker.i: display_worker.cpp.i
+.PHONY : display_worker.i
+
+# target to preprocess a source file
+display_worker.cpp.i:
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38 && $(MAKE) $(MAKESILENT) -f calibur/worker/CMakeFiles/calibur_worker_core.dir/build.make calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.i
+.PHONY : display_worker.cpp.i
+
+display_worker.s: display_worker.cpp.s
+.PHONY : display_worker.s
+
+# target to generate assembly for a file
+display_worker.cpp.s:
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38 && $(MAKE) $(MAKESILENT) -f calibur/worker/CMakeFiles/calibur_worker_core.dir/build.make calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.s
+.PHONY : display_worker.cpp.s
+
 imu_worker.o: imu_worker.cpp.o
 .PHONY : imu_worker.o
 
@@ -313,6 +337,9 @@ help:
 	@echo "... detection_worker.o"
 	@echo "... detection_worker.i"
 	@echo "... detection_worker.s"
+	@echo "... display_worker.o"
+	@echo "... display_worker.i"
+	@echo "... display_worker.s"
 	@echo "... imu_worker.o"
 	@echo "... imu_worker.i"
 	@echo "... imu_worker.s"

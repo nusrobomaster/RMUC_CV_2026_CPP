@@ -203,6 +203,7 @@ private:
     SharedLatest      &shared_;
     std::atomic<bool> &stop_;
     uint64_t           last_det_ver_ = 0;
+    int frames_without_detection_;  
 
     // Heap-allocated PF model
     std::unique_ptr<RBPFPosYawModelGPU> g_pf;
@@ -212,6 +213,7 @@ private:
     void gpu_pf_reset(const RobotState &meas);
     void gpu_pf_predict_only();
     void gpu_pf_step(const RobotState &meas);
+    bool is_state_valid(const RobotState &state);
     RobotState gpu_return_result();
 };
 
@@ -237,6 +239,10 @@ private:
     int            fire_state = false;
     int            chase_state = false;
     int            aim_state = false;
+
+    float vis_yaw_   = 0.0f;
+    float vis_pitch_ = 0.0f;
+    bool  vis_init_  = false;
 
     void sleep_small();
 
@@ -267,5 +273,23 @@ private:
     void process_usb_rx();
     void usb_send_tx(const PredictionOut &out);
 };
+
+//--------------------------------------------Display Worker--------------------------------------------
+
+class DisplayWorker {
+public:
+    DisplayWorker(SharedLatest &shared, std::atomic<bool> &stop_flag);
+    void operator()();
+
+private:
+    SharedLatest &shared_;
+    std::atomic<bool> &stop_flag_;
+
+    // Helpers
+    void draw_crosshair(cv::Mat &img, const PredictionOut *pred);
+    void draw_yolo_overlay(cv::Mat &img, const YoloOutput *yolo);
+    void draw_info_panel(cv::Mat &img, const PredictionOut *pred, double fps);
+    void draw_target_dot(cv::Mat &img, const PredictionOut *pred, int width, int height);
+};                                                          
 
 

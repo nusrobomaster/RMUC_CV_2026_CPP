@@ -53,10 +53,10 @@ void YoloWorker::operator()() {
             dets.emplace_back(r);
         }
 #ifdef DISPLAY_DETECTION
-        cv::Mat img = cam->raw_data.clone(); 
-        YoloDetector::draw_image(img, yolo_dets, true, false);
-        cv::imshow("YOLO Pose", img);
-        cv::waitKey(1); 
+        // cv::Mat img = cam->raw_data.clone(); 
+        // YoloDetector::draw_image(img, yolo_dets, true, false);
+        // cv::imshow("YOLO Pose", img);
+        // cv::waitKey(1); 
 #endif
         // ---- 4) publish YOLO output ----
         auto yo = std::make_shared<YoloOutput>();

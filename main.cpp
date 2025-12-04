@@ -5,6 +5,7 @@
 #include "./calibur/worker/types.hpp"
 #include "./calibur/worker/thread_pool.hpp"
 #include "./calibur/worker/workers.hpp"
+
 #include "../camera/MvCameraControl.h"
 
 static std::atomic<bool> g_stop_flag{false};
@@ -42,7 +43,7 @@ void* init_camera_stub() {
     // Optional: configure acquisition/trigger mode here
 
     MV_CC_SetEnumValue(handle, "ExposureAuto", 2); 
-    MV_CC_SetFloatValue(handle, "ExposureTime", 10000.0f); // 10 ms
+    MV_CC_SetFloatValue(handle, "ExposureTime", 7000.0f); // 10 ms
     MV_CC_SetEnumValue(handle, "GainAuto", 2);
     MV_CC_SetEnumValue(handle, "AcquisitionMode", 2); // Continuous
     MV_CC_SetEnumValue(handle, "TriggerMode", 0);     // Off
@@ -79,6 +80,10 @@ int main() {
     pool.submit(DetectionWorker(std::ref(shared), std::ref(g_stop_flag)));
     pool.submit(PredictionWorker(std::ref(shared), std::ref(scalars), std::ref(g_stop_flag)));
     //pool.submit(USBWorker(std::ref(shared), std::ref(scalars), std::ref(g_stop_flag)));
+    pool.submit([&shared]() {
+        DisplayWorker worker(shared, g_stop_flag);
+        worker();
+    });
 
     PFWorker pf_worker(shared, g_stop_flag);
     std::thread pf_thread(std::ref(pf_worker));

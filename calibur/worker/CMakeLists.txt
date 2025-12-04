@@ -8,6 +8,7 @@ set(WORKER_SOURCES
     prediction_worker.cpp
     usb_worker.cpp
     yolo_worker.cpp
+    display_worker.cpp
 )
 
 # Create the static library target

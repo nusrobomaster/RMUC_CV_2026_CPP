@@ -13,7 +13,7 @@ const int kKptDims = 3;  // 单个关键点的维度，2 for x,y or 3 for x,y,vi
 const int kInputH = 640;
 const int kInputW = 640;
 const float kNmsThresh = 0.45f;
-const float kConfThresh = 0.25f;
+const float kConfThresh = 0.50f;
 const int kMaxNumOutputBbox = 1000;  // assume the box outputs no more than kMaxNumOutputBbox boxes that conf >= kNmsThresh;
 const int kNumBoxElement = 7 + kNumKpt * kKptDims;  // left, top, right, bottom, confidence, class, keepflag(whether drop when NMS), 51 keypoints
 

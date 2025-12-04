@@ -1,9 +1,12 @@
 #include "workers.hpp"
-#include "../camera/MvCameraControl.h"  // Hikrobot SDK
+#include "../camera/MvCameraControl.h"
 
 #include <iostream>
 #include <thread>
 #include <cstring>
+#include <opencv2/highgui.hpp>
+
+
 
 // -------------------------------- CameraWorker --------------------------------
 
@@ -39,8 +42,54 @@ CameraWorker::CameraWorker(void* cam_handle,
     }
 }
 
+// void CameraWorker::operator()() {
+//     int nRet = MV_OK;
+
+//     // Start grabbing for Hik mode
+//     if (!use_stub_ && mode_ == CameraMode::HIK_USB) {
+//         nRet = MV_CC_StartGrabbing(cam_);
+//         if (nRet != MV_OK) {
+//             std::cerr << "[CameraWorker] MV_CC_StartGrabbing failed: " << nRet
+//                       << ". Using stub frames instead.\n";
+//             use_stub_ = true;
+//         }
+//     }
+
+//     while (!stop_.load(std::memory_order_relaxed)) {
+//         CameraFrame frame;
+
+//         if (use_stub_) {
+//             grab_frame_stub(frame);
+//         } else if (mode_ == CameraMode::HIK_USB) {
+//             grab_frame_from_hik(frame);
+//         } else { // VIDEO_FILE
+//             grab_frame_from_video(frame);
+//         }
+
+//         auto ptr = std::make_shared<CameraFrame>(std::move(frame));
+//         std::atomic_store(&shared_.camera, ptr);
+//         shared_.camera_ver.fetch_add(1, std::memory_order_relaxed);
+
+//         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+//     }
+
+//     // Stop grabbing for Hik mode
+//     if (!use_stub_ && mode_ == CameraMode::HIK_USB) {
+//         MV_CC_StopGrabbing(cam_);
+//     }
+
+//     if (mode_ == CameraMode::VIDEO_FILE && cap_.isOpened()) {
+//         cap_.release();
+//     }
+// }
+
+
 void CameraWorker::operator()() {
     int nRet = MV_OK;
+
+#ifdef ENABLE_GUI
+    cv::namedWindow("Aimbot Debug", cv::WINDOW_NORMAL);
+#endif
 
     // Start grabbing for Hik mode
     if (!use_stub_ && mode_ == CameraMode::HIK_USB) {
@@ -55,6 +104,7 @@ void CameraWorker::operator()() {
     while (!stop_.load(std::memory_order_relaxed)) {
         CameraFrame frame;
 
+        // 1) Acquire frame
         if (use_stub_) {
             grab_frame_stub(frame);
         } else if (mode_ == CameraMode::HIK_USB) {
@@ -63,14 +113,29 @@ void CameraWorker::operator()() {
             grab_frame_from_video(frame);
         }
 
+        // 2) Publish raw frame to shared
         auto ptr = std::make_shared<CameraFrame>(std::move(frame));
         std::atomic_store(&shared_.camera, ptr);
         shared_.camera_ver.fetch_add(1, std::memory_order_relaxed);
 
+#ifdef ENABLE_GUI
+        // 3) Debug view with crosshair
+        if (!ptr->raw_data.empty()) {
+            cv::Mat debug_img = ptr->raw_data.clone();
+
+            drawCrosshairOverlay(debug_img);
+
+            cv::imshow("Aimbot Debug", debug_img);
+            int key = cv::waitKey(1);
+            if (key == 27) { // ESC
+                stop_.store(true, std::memory_order_relaxed);
+            }
+        }
+#endif
+
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    // Stop grabbing for Hik mode
     if (!use_stub_ && mode_ == CameraMode::HIK_USB) {
         MV_CC_StopGrabbing(cam_);
     }
@@ -78,17 +143,24 @@ void CameraWorker::operator()() {
     if (mode_ == CameraMode::VIDEO_FILE && cap_.isOpened()) {
         cap_.release();
     }
+
+#ifdef ENABLE_GUI
+    cv::destroyWindow("Aimbot Debug");
+#endif
 }
+
+
 
 void CameraWorker::grab_frame_stub(CameraFrame &frame) {
     frame.timestamp = Clock::now();
     frame.width  = 640;
     frame.height = 640;
 
-    frame.raw_data = cv::Mat(frame.height,
-                             frame.width,
-                             CV_8UC3,
-                             cv::Scalar(128, 128, 128));
+    frame.raw_data = cv::Mat(
+        frame.height,
+        frame.width,
+        CV_8UC3,
+        cv::Scalar(128, 128, 128));
 }
 
 // ---------- HIK camera grab ----------

@@ -9,7 +9,7 @@ target_include_directories(test_camera
     PRIVATE
         ${CMAKE_SOURCE_DIR}              # for "calibur/camera/..."
         ${CMAKE_CURRENT_SOURCE_DIR}      # for "MvCameraControl.h"
-        /opt/MVS/include                 # HIK SDK headers
+        /opt/MVS/lib/aarch64                # HIK SDK headers
 )
 
 # Where to find the .so/.a for HIK SDK

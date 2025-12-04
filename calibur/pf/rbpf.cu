@@ -736,6 +736,22 @@ RobotState rbpf_get_mean(RBPFPosYawModelGPU *pf) {
 
     RobotState rs{};
     // TODO: map host_mean[0..14] -> rs fields
+    for (int i = 0; i < ROBOT_STATE_VEC_LEN; ++i) {
+        rs.state[i] = host_mean[i];
+    }
+
+    // you can also set extra fields if you want:
+    // rs.class_id = 0; // or track it somewhere
+    // rs.pf_state = PF_STATE_OK;
+    rs.timestamp = Clock::now();
+
+    // std::fprintf(stderr,
+    //     "[RBPF mean] x=%f y=%f z=%f yaw=%f\n",
+    //     rs.state[IDX_TX],
+    //     rs.state[IDX_TY],
+    //     rs.state[IDX_TZ],
+    //     rs.state[IDX_YAW]);
+
     return rs;
 }
 

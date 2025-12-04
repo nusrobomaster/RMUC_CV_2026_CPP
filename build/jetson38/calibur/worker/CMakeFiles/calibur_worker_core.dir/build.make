@@ -170,6 +170,20 @@ calibur/worker/CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.s"
 	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspace/aimbot_cpp/RMUC_CV_2026_C-/calibur/worker/yolo_worker.cpp -o CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.s
 
+calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o: calibur/worker/CMakeFiles/calibur_worker_core.dir/flags.make
+calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o: /workspace/aimbot_cpp/RMUC_CV_2026_C-/calibur/worker/display_worker.cpp
+calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o: calibur/worker/CMakeFiles/calibur_worker_core.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o"
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o -MF CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o.d -o CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o -c /workspace/aimbot_cpp/RMUC_CV_2026_C-/calibur/worker/display_worker.cpp
+
+calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/calibur_worker_core.dir/display_worker.cpp.i"
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspace/aimbot_cpp/RMUC_CV_2026_C-/calibur/worker/display_worker.cpp > CMakeFiles/calibur_worker_core.dir/display_worker.cpp.i
+
+calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/calibur_worker_core.dir/display_worker.cpp.s"
+	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspace/aimbot_cpp/RMUC_CV_2026_C-/calibur/worker/display_worker.cpp -o CMakeFiles/calibur_worker_core.dir/display_worker.cpp.s
+
 # Object files for target calibur_worker_core
 calibur_worker_core_OBJECTS = \
 "CMakeFiles/calibur_worker_core.dir/camera_worker.cpp.o" \
@@ -178,7 +192,8 @@ calibur_worker_core_OBJECTS = \
 "CMakeFiles/calibur_worker_core.dir/pf_worker.cpp.o" \
 "CMakeFiles/calibur_worker_core.dir/prediction_worker.cpp.o" \
 "CMakeFiles/calibur_worker_core.dir/usb_worker.cpp.o" \
-"CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.o"
+"CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.o" \
+"CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o"
 
 # External object files for target calibur_worker_core
 calibur_worker_core_EXTERNAL_OBJECTS =
@@ -190,9 +205,10 @@ calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worke
 calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/prediction_worker.cpp.o
 calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/usb_worker.cpp.o
 calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/yolo_worker.cpp.o
+calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/display_worker.cpp.o
 calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/build.make
 calibur/worker/libcalibur_worker_core.a: calibur/worker/CMakeFiles/calibur_worker_core.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library libcalibur_worker_core.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking CXX static library libcalibur_worker_core.a"
 	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && $(CMAKE_COMMAND) -P CMakeFiles/calibur_worker_core.dir/cmake_clean_target.cmake
 	cd /workspace/aimbot_cpp/RMUC_CV_2026_C-/build/jetson38/calibur/worker && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/calibur_worker_core.dir/link.txt --verbose=$(VERBOSE)
 

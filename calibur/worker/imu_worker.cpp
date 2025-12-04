@@ -64,34 +64,31 @@ void IMUWorker::operator()() {
         std::atomic_store(&shared_.imu, ptr);
         shared_.imu_ver.fetch_add(1, std::memory_order_relaxed);
 
-        // -------------------------------
-        // PRINT OUTPUT EVERY ~10 ITERATIONS
-        // -------------------------------
-        if (++print_counter >= 10) {
-            print_counter = 0;
+        // if (++print_counter >= 10) {
+        //     print_counter = 0;
 
-            std::cout << "[IMU] ";
+        //     std::cout << "[IMU] ";
 
-            if (!st.euler_angle.empty()) {
-                std::cout << "Roll="  << st.euler_angle[0]
-                          << "  Pitch=" << st.euler_angle[1]
-                          << "  Yaw="   << st.euler_angle[2];
-            }
+        //     if (!st.euler_angle.empty()) {
+        //         std::cout << "Roll="  << st.euler_angle[0]
+        //                   << "  Pitch=" << st.euler_angle[1]
+        //                   << "  Yaw="   << st.euler_angle[2];
+        //     }
 
-            if (!st.quaternion.empty()) {
-                std::cout << "  |  Q=("
-                          << st.quaternion[0] << ", "
-                          << st.quaternion[1] << ", "
-                          << st.quaternion[2] << ", "
-                          << st.quaternion[3] << ")";
-            }
+        //     if (!st.quaternion.empty()) {
+        //         std::cout << "  |  Q=("
+        //                   << st.quaternion[0] << ", "
+        //                   << st.quaternion[1] << ", "
+        //                   << st.quaternion[2] << ", "
+        //                   << st.quaternion[3] << ")";
+        //     }
 
-            if (raw.has_temp) {
-                std::cout << "  |  Temp=" << raw.temp_c << "°C";
-            }
+        //     if (raw.has_temp) {
+        //         std::cout << "  |  Temp=" << raw.temp_c << "°C";
+        //     }
 
-            std::cout << std::endl;
-        }
+        //     std::cout << std::endl;
+        // }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }

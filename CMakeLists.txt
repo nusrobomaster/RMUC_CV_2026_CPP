@@ -150,6 +150,7 @@ add_subdirectory(calibur/worker)
 # ----------------- Executable -----------------
 add_executable(calibur_worker
     main.cpp
+    # tests/test_imu.cc
 )
 
 target_link_libraries(calibur_worker

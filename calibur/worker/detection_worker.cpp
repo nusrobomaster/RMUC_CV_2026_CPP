@@ -46,8 +46,8 @@ DetectionWorker::DetectionWorker(SharedLatest &shared,
 
     // Camera intrinsics
     camera_matrix = (cv::Mat_<double>(3, 3) <<
-        2431.4,    0.0,       629.6101,
-        0.0,       2430.4,    584.5141,
+        2431.4,    0.0,       320,
+        0.0,       2430.4,    320,
         0.0,       0.0,       1.0
     );
     dist_coeffs = (cv::Mat_<double>(1, 5) <<
@@ -89,7 +89,11 @@ void DetectionWorker::operator()() {
 
         // 1) YOLO
         //yolo_predict(cam->raw_data, cam->width, cam->height, dets);
-
+        dets = yolo_result->dets;      
+        if (dets.empty()) {
+            selected_armors.clear();
+            continue;
+        }
         // 2) keypoint refine + filtering by confidence
         refine_keypoints(dets, yolo_result->width, yolo_result->height);
 
@@ -97,22 +101,40 @@ void DetectionWorker::operator()() {
         solvepnp_and_yaw(dets);
 
         // 4) group + select
+        grouped_armors.clear();
         group_armors(dets, grouped_armors);
+        selected_armors.clear();
         select_armor(grouped_armors, ttl_, selected_robot_id_, initial_yaw_, selected_armors);
 
         // 5) transform to world using latest IMU
         //TODO: considering whether to do pnp first or select robot first
         bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
         if (success) {
-            const Eigen::Matrix3f R_world2cam = make_R_cam2world_from_yaw_pitch(imu_yaw, imu_pitch);
+            const Eigen::Matrix3f R_cam2world = make_R_cam2world_from_yaw_pitch(imu_yaw, imu_pitch);
+
+            
             for (auto &det : selected_armors) {
-                cam2world(det, R_world2cam, imu_yaw, imu_pitch);
+                // Transform from camera frame to world frame
+                cam2world(det, R_cam2world, imu_yaw, imu_pitch);
             }
+
+            std::cout << "[PNP]: x=" << selected_armors[0].tvec[0]
+                          << " y="     << selected_armors[0].tvec[1]
+                          << " z="     << selected_armors[0].tvec[2] <<
+                      " yaw_rad: " << selected_armors[0].yaw_rad
+                      << std::endl;
 
             // 6) form RobotState
             auto robot = form_robot(selected_armors);
             if (robot) {
                 robot->timestamp = yolo_result->timestamp;
+
+                std::cout << "[DET] x=" << robot->state[IDX_TX]
+                          << " y="     << robot->state[IDX_TY]
+                          << " z="     << robot->state[IDX_TZ]
+                          << " yaw="   << robot->state[IDX_YAW]
+                          << std::endl;
+
                 auto ptr = std::make_shared<RobotState>(*robot);
                 std::atomic_store(&shared_.detection_out, ptr);
                 shared_.detection_ver.fetch_add(1, std::memory_order_relaxed);
@@ -210,7 +232,11 @@ void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
 
 void DetectionWorker::group_armors(const std::vector<DetectionResult> &dets,
                                     std::vector<std::vector<DetectionResult>> &grouped_armors) {
+    grouped_armors.clear();
 
+    for (const auto &d : dets) {
+        grouped_armors.push_back(std::vector<DetectionResult>{ d });
+    }
 }
 
 void DetectionWorker::select_armor(const std::vector<std::vector<DetectionResult>> &grouped_armors,
@@ -285,21 +311,29 @@ DetectionWorker::form_robot(const std::vector<DetectionResult> &armors) {
     } else {
         form_ok = from_two_armors(armors[0], armors[1], prev_robot_, this->has_prev_robot_);
     }
+
     if (form_ok) {
+        this->has_prev_robot_ = true;
+
+        auto rs = std::make_unique<RobotState>(prev_robot_);
         return rs;
     }
     if (this->has_prev_robot_) {
         return std::make_unique<RobotState>(prev_robot_);
     }
+
     return nullptr;
 }
 
 
 //---------------------------- detection helper -----------------------------//
 
-inline void cam2world(DetectionResult &det, const Eigen::Matrix3f &R_world2cam,
+inline void cam2world(DetectionResult &det, const Eigen::Matrix3f &R_cam2world,
                      const float imu_yaw, const float imu_pitch) {
-    det.tvec = R_world2cam * det.tvec;
+    // Transform position from camera frame to world frame
+    det.tvec = R_cam2world * det.tvec;
+    
+    // Transform yaw: robot yaw relative to camera + camera yaw in world
     det.yaw_rad += imu_yaw;
 }
 
