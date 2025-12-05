@@ -1,2 +1,5 @@
 .vscode
 bin/
+build/
+MvSdkLog/
+MvSDKLog/
