@@ -161,10 +161,10 @@ void PFWorker::operator()() {
             continue;
         }
         
-        // std::cout << "[PF OUT] x=" << pf_state.state[IDX_TX]
-        //           << " y=" << pf_state.state[IDX_TY]
-        //           << " z=" << pf_state.state[IDX_TZ]
-        //           << " yaw=" << pf_state.state[IDX_YAW] << std::endl;
+        std::cout << "[PF ] x=" << pf_state.state[IDX_TX]
+                  << " y=" << pf_state.state[IDX_TY]
+                  << " z=" << pf_state.state[IDX_TZ]
+                  << " yaw=" << pf_state.state[IDX_YAW] << std::endl;
 
         shared_.pf_out = std::make_shared<RobotState>(pf_state);
         shared_.pf_ver.fetch_add(1, std::memory_order_acq_rel);

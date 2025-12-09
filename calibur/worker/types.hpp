@@ -112,8 +112,10 @@ struct SharedLatest {
 
 struct SharedScalars {
     std::atomic<float> bullet_speed;
+    std::atomic<float> initial_yaw; //reset this when target first locked on
 
     SharedScalars() {
         bullet_speed.store(20.0f, std::memory_order_relaxed); // default m/s
+        initial_yaw.store(0.0f, std::memory_order_relaxed);
     }
 };

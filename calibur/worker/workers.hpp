@@ -129,13 +129,14 @@ private:
 
 class DetectionWorker {
 public:
-    DetectionWorker(SharedLatest &shared,
+    DetectionWorker(SharedLatest &shared, SharedScalars &shared_scalars,
                     std::atomic<bool> &stop_flag);
 
     void operator()();
 
 private:
     SharedLatest    &shared_;
+    SharedScalars   &scalars_;
     std::atomic<bool> &stop_;
 
     // "class variables"
@@ -187,7 +188,7 @@ struct RBPFPosYawModelGPU;
 
 class PFWorker {
 public:
-    PFWorker(SharedLatest &shared,
+    PFWorker(SharedLatest &shared, 
              std::atomic<bool> &stop_flag);
 
     // Runs as dedicated thread (not via pool)
@@ -249,6 +250,7 @@ private:
     void compute_prediction(const RobotState &rs,
                             const IMUState *imu,
                             float bullet_speed,
+                            float init_yaw,
                             PredictionOut &out);
 
     double time_to_double(const TimePoint &tp);

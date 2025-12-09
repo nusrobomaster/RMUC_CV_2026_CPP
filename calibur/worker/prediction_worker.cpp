@@ -59,11 +59,12 @@ void PredictionWorker::operator()() {
         if (!pf || !imu) {
             continue;
         }
+        float init_yaw = std::atomic_load(&scalars_.initial_yaw);
 
         float measured_speed = scalars_.bullet_speed.load(std::memory_order_relaxed);
 
         PredictionOut out{};
-        compute_prediction(*pf, imu.get(), measured_speed, out);
+        compute_prediction(*pf, imu.get(), measured_speed, init_yaw, out);
 
         auto ptr = std::make_shared<PredictionOut>(out);
         std::atomic_store(&shared_.prediction_out, ptr);
@@ -78,6 +79,7 @@ void PredictionWorker::sleep_small() {
 void PredictionWorker::compute_prediction(const RobotState &rs,
                                           const IMUState *imu,
                                           float measured_speed,
+                                          float init_yaw,
                                           PredictionOut &out)
 {
     // Re-used buffers per thread
@@ -196,7 +198,8 @@ void PredictionWorker::compute_prediction(const RobotState &rs,
     }
 
     // ----------------- 5) world -> camera using IMU ----------------
-    bool imu_ok = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
+    float relative_yaw = imu_yaw - init_yaw;
+    bool imu_ok = get_imu_yaw_pitch(this->shared_, relative_yaw, imu_pitch);
     if (!imu_ok) {
         out.yaw   = 0.0f;
         out.pitch = 0.0f;

@@ -34,9 +34,9 @@ inline bool from_two_armors(const DetectionResult &det1, const DetectionResult &
 
 using RobotStatePtr = std::shared_ptr<const RobotState>;
 
-DetectionWorker::DetectionWorker(SharedLatest &shared,
+DetectionWorker::DetectionWorker(SharedLatest &shared, SharedScalars &shared_scalars,
                 std::atomic<bool> &stop_flag)
-    : shared_(shared), stop_(stop_flag)
+    : shared_(shared), stop_(stop_flag), scalars_(shared_scalars)
 {
     start_time_        = Clock::now();
     selected_robot_id_ = -1;
@@ -75,6 +75,8 @@ void DetectionWorker::operator()() {
     static thread_local std::vector<std::vector<DetectionResult>> grouped_armors;
     //static thread_local RobotState robot;
 
+    bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
+    if (success) scalars_.initial_yaw.store(imu_yaw);
 
     while (!stop_.load(std::memory_order_relaxed)) {
 
@@ -115,13 +117,13 @@ void DetectionWorker::operator()() {
         // 5) transform to world using latest IMU
         //TODO: considering whether to do pnp first or select robot first
         bool success = get_imu_yaw_pitch(this->shared_, imu_yaw, imu_pitch);
-        if (success) {
-            const Eigen::Matrix3f R_cam2world = make_R_cam2world_from_yaw_pitch(imu_yaw, imu_pitch);
+        float init_yaw = std::atomic_load(&scalars_.initial_yaw);
 
-            
+        if (success) {
+            const Eigen::Matrix3f R_cam2world = make_R_cam2world_from_yaw_pitch(imu_yaw - init_yaw, imu_pitch);
             for (auto &det : selected_armors) {
                 // Transform from camera frame to world frame
-                cam2world(det, R_cam2world, imu_yaw, imu_pitch);
+                cam2world(det, R_cam2world, imu_yaw - init_yaw, imu_pitch);
             }
 
             std::cout << "[PNP]: x=" << selected_armors[0].tvec[0]
@@ -213,8 +215,9 @@ void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
         euler_angles = cv::RQDecomp3x3(R, K_ignore, R_ignore);
 
         // 8. Yaw angle with optimisation
-        float yaw_deg = static_cast<float>(euler_angles[1]);  // Yaw
+        float yaw_deg = static_cast<float>(euler_angles[1]);  // +ve or -ve?
         yaw_deg = wrap_deg(yaw_deg);
+        // det.yaw_rad = smoothed_yaw_deg * M_PI / 180.0f;
 
         if (yaw_deg > 180.0f || yaw_deg < -180.0f) {
             continue;
@@ -231,10 +234,18 @@ void DetectionWorker::solvepnp_and_yaw(std::vector<DetectionResult> &dets) {
         } else {
             smoothed_yaw_deg = yaw_deg;
         }
-        yaw_smooth_state[key] = smoothed_yaw_deg * M_PI / 180.0f;
-        det.yaw_rad = static_cast<float>(yaw_deg * M_PI / 180.0f);
-    }
+        
+        // yaw_smooth_state[key] = smoothed_yaw_deg * M_PI / 180.0f;
+        smoothed_yaw_deg = static_cast<float>(abs(smoothed_yaw_deg));
+        if ((img_pts_arr[0].x) > (img_pts_arr[3].x)){
+            det.yaw_rad = smoothed_yaw_deg * M_PI / 180.0f;
+        }
 
+        else{
+            det.yaw_rad = static_cast<float>(-smoothed_yaw_deg * M_PI / 180.0f);
+        }
+        yaw_smooth_state[key] = static_cast<float>(det.yaw_rad*180.0f/M_PI);
+    }
 }
 
 
