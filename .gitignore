@@ -4,4 +4,4 @@ build/
 
 # HikCamera SDK
 MvSdkLog/
-MvSDKLog/
+MvSDKLog/pf_debug.txt
