@@ -5,8 +5,6 @@
 #include "protocol_data.hpp"
 #include "../log.h"
 
-// static calibur::Logger::ptr g_logger = CALIBUR_LOG_NAME("usb");
-
 USBWorker::USBWorker(SharedLatest &shared,
             SharedScalars &scalars,
             std::atomic<bool> &stop_flag,
@@ -14,41 +12,51 @@ USBWorker::USBWorker(SharedLatest &shared,
     : shared_(shared), scalars_(scalars), stop_(stop_flag), last_pred_ver_(0), usb_comm_(std::move(usb_comm)) {}
 
 void USBWorker::operator()() {
-    usb_comm_->open();
+    if (!usb_comm_->open()) {
+        std::cerr << "[USBWorker] Failed to open USB device!" << std::endl;
+        return;
+    }
     usb_comm_->configure(115200);
+
+    // 1. Initialize a "previous data" packet with zeros
+    Protocol::AimbotData last_pkt{0.0f, 0.0f, 0.0f};
+    
+    const auto loop_interval = std::chrono::milliseconds(10); // 100Hz
+
     while (!stop_.load(std::memory_order_relaxed)) {
-        process_usb_rx(); // updates scalars_.bullet_speed etc.
+        auto start_time = std::chrono::steady_clock::now();
 
-        uint64_t cur_ver = shared_.prediction_ver.load(std::memory_order_relaxed);
-        if (cur_ver == last_pred_ver_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue; // no new prediction
-        
+        process_usb_rx();
+
+        // 2. Try to get new data from the PredictionWorker
+        auto pred_ptr = std::atomic_load(&shared_.prediction_out);
+
+        if (pred_ptr) {
+            // New data exists: Update our "previous data" buffer
+            last_pkt.yaw   = pred_ptr->yaw + -0.05;
+            last_pkt.pitch = pred_ptr->pitch + 0.05;
+            last_pkt.fire  = static_cast<float>(pred_ptr->fire);
+        } 
+        // else: we don't update last_pkt, keeping the previous values
+
+        // 3. ALWAYS send the current state of last_pkt
+        usb_comm_->sendData(Protocol::Type::aimbot, &last_pkt, sizeof(last_pkt));
+
+        // 4. Maintain constant 100Hz frequency
+        auto end_time = std::chrono::steady_clock::now();
+        auto elapsed = end_time - start_time;
+        if (elapsed < loop_interval) {
+            std::this_thread::sleep_for(loop_interval - elapsed);
         }
-        last_pred_ver_ = cur_ver;
-
-        auto pred = std::atomic_load(&shared_.prediction_out);
-         
-        Protocol::AngleData ang{.pitch = 10.5f, .yaw = -22.0f};
-        usb_comm_->sendData(Protocol::Type::angle_correction, &ang, sizeof(Protocol::AngleData));
-        Protocol::CommandData cmd{.fire = 1, .aim = 0, .chase = 1};
-        usb_comm_->sendData(Protocol::Type::command, &cmd, sizeof(Protocol::CommandData));
-        
-        // Switch off for now, uncomment when pipeline is stable to send data
-        // if (pred) {
-        //     usb_send_tx(*pred);
-        // }
-
     }
 }
 
 void USBWorker::process_usb_rx() {
-    // parse incoming packets
-    // e.g. update scalars_.bullet_speed.store(new_speed);
+    // parse incoming packets if you later implement MCU->Jetson
 }
 
 void USBWorker::usb_send_tx(const PredictionOut &out) {
-    // encode yaw, pitch, aim, fire, chase to COM
-    // usb_comm_->sendData(out.yaw, out.pitch, out.aim, out.fire, out.chase);
+    // If you want to send real prediction:
+    // Protocol::AimbotData pkt{ .yaw = out.yaw, .pitch = out.pitch, .fire = out.fire ? 1.0f : 0.0f };
+    // usb_comm_->sendData(Protocol::Type::aimbot, &pkt, sizeof(pkt));
 }
-
