@@ -47,7 +47,7 @@ add_library(calibur_worker_core STATIC ${WORKER_SOURCES})
 target_compile_features(calibur_worker_core PUBLIC cxx_std_17)
 
 # Optional macro if you want to guard any rerun-only code (even though it's always on)
-target_compile_definitions(calibur_worker_core PUBLIC CALIBUR_ENABLE_RERUN=1)
+target_compile_definitions(calibur_worker_core PUBLIC CALIBUR_ENABLE_RERUN=0)
 
 # Target-specific includes (Internal headers)
 target_include_directories(calibur_worker_core

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Project root = directory of this script
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -81,11 +81,12 @@ CMAKE_ARGS=(
   -S "${ROOT_DIR}"
   -B "${BUILD_DIR}"
   -DCMAKE_BUILD_TYPE=Debug
-  -DCUDAToolkit_ROOT=/usr/local/cuda-12.9
+  -DCUDAToolkit_ROOT=/usr/local/cuda-12.6
   -DCALIBUR_PLATFORM="${CALIBUR_PLATFORM}"
   -DFETCHCONTENT_SOURCE_DIR_RERUN_SDK="${RERUN_LOCAL_DIR}"
   # THIS is the missing piece: tell FetchContent to use local Arrow instead of downloading
   -DFETCHCONTENT_SOURCE_DIR_ARROW_CPP="${ARROW_LOCAL_DIR}"
+
 )
 
 if [[ -n "${CALIBUR_L4T:-}" ]]; then

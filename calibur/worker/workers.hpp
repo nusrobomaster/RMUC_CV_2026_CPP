@@ -219,4 +219,7 @@ private:
     void draw_refined_overlay(cv::Mat &img, const std::vector<DetectionResult>* refined_dets);
     void draw_info_panel(cv::Mat &img, const PredictionOut *pred, double fps);
     void draw_target_dot(cv::Mat &img, const PredictionOut *pred, int width, int height);
+    void draw_target_dot_and_fps(cv::Mat &img,
+                                    const PredictionOut *pred,
+                                    int width, int height,double fps);
 };

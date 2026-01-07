@@ -130,19 +130,19 @@ namespace calibur {
 
     bool USBCommunication::sendData(Protocol::Type type, const void* data, std::size_t size) {
         if (!is_open_ || fd_ < 0) {
-            // CALIBUR_LOG_ERROR(g_logger) << "Cannot send: USB device not open";
             return false;
         }
 
-        if(!data || size == 0 || size > Protocol::MAX_PAYLOAD_SIZE) {
+        if (!data || size == 0 || size > Protocol::MAX_PAYLOAD_SIZE) {
             return false;
         }
 
         uint8_t packet[Protocol::MAX_PACKET_SIZE];
-        const std::size_t payload_offset = Protocol::HEADER_SIZE;
-        const std::size_t total_no_crc = payload_offset + size;
+
+        const std::size_t payload_offset = Protocol::HEADER_SIZE;     // 4
+        const std::size_t total_no_crc   = payload_offset + size;
         const std::size_t total_with_crc = total_no_crc + Protocol::CRC_SIZE;
- 
+
         packet[0] = Protocol::HEADER_BYTE;
         packet[1] = static_cast<std::uint8_t>(size & 0xFF);
         packet[2] = static_cast<std::uint8_t>((size >> 8) & 0xFF);
@@ -151,16 +151,17 @@ namespace calibur {
         std::memcpy(&packet[payload_offset], data, size);
 
         std::uint16_t crc = crc16_(packet, total_no_crc);
-        packet[total_no_crc] = crc & 0xFF;
-        packet[total_no_crc + 1] = (crc >> 8) & 0xFF;
-        
-        ssize_t written = write(fd_, packet, total_with_crc);
+        packet[total_no_crc + 0] = static_cast<uint8_t>(crc & 0xFF);        // CRC_LO
+        packet[total_no_crc + 1] = static_cast<uint8_t>((crc >> 8) & 0xFF); // CRC_HI
+
+        ssize_t written = ::write(fd_, packet, total_with_crc);
         if (written != static_cast<ssize_t>(total_with_crc)) {
-            // CALIBUR_LOG_ERROR(g_logger) << "Write failed: expected 11 bytes, wrote "  << written << ", error: " << strerror(errno);
+            std::cout << "Write failed: expected " << total_with_crc
+                    << " bytes, wrote " << written
+                    << ", error: " << strerror(errno) << std::endl;
             return false;
         }
-        
-        // CALIBUR_LOG_DEBUG(g_logger) << "Sent data: yaw=" << yaw << ", pitch=" << pitch  << ", is_fire=" << (is_fire ? "true" : "false");
+
         return true;
     }
 
