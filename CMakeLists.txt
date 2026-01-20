@@ -1,6 +1,6 @@
 # ROOT CMakeLists.txt
-
 cmake_minimum_required(VERSION 3.10) 
+
 # Explicitly set the compiler path as a fallback
 set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc" CACHE FILEPATH "Path to nvcc compiler")
 
@@ -116,7 +116,7 @@ find_package(yaml-cpp REQUIRED)
 # This must be done because we're not using the imported targets.
 include_directories(
     ${OpenCV_INCLUDE_DIRS}
-    /opt/MVS/include    
+    /opt//MVS/include    
     ${CMAKE_SOURCE_DIR}/calibur/camera
 )
 

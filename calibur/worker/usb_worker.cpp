@@ -33,7 +33,7 @@ void USBWorker::operator()() {
 
         if (pred_ptr) {
             // New data exists: Update our "previous data" buffer
-            last_pkt.yaw   = pred_ptr->yaw + -0.05;
+            last_pkt.yaw   = pred_ptr->yaw;
             last_pkt.pitch = pred_ptr->pitch + 0.05;
             last_pkt.fire  = static_cast<float>(pred_ptr->fire);
         } 

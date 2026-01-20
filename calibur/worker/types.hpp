@@ -9,6 +9,8 @@
 #include <array>        
 #include <opencv2/core.hpp>
 #include <Eigen/Dense>
+#include <mutex>
+#include <deque>
 
 using Clock     = std::chrono::steady_clock;
 using TimePoint = Clock::time_point;
@@ -99,7 +101,8 @@ struct PredictionOut {
 struct SharedLatest {
     // Data
     std::shared_ptr<CameraFrame>   camera;
-    std::shared_ptr<IMUState>      imu;
+   // std::shared_ptr<std::deque<IMUState>> imu;
+   // mutable std::mutex imu
     std::shared_ptr<RobotState>    detection_out;
     std::shared_ptr<RobotState>    pf_out;
     std::shared_ptr<PredictionOut> prediction_out;
@@ -111,7 +114,7 @@ struct SharedLatest {
 
     // Version counters (increment per new publish)
     std::atomic<uint64_t> camera_ver     {0};
-    std::atomic<uint64_t> imu_ver        {0};
+    // std::atomic<uint64_t> imu_ver        {0};
     std::atomic<uint64_t> detection_ver  {0};
     std::atomic<uint64_t> pf_ver         {0};
     std::atomic<uint64_t> prediction_ver {0};
