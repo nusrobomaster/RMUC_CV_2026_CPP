@@ -8,10 +8,10 @@
 constexpr int CUDA_BLOCK_SIZE = 256;
 
 // ===================== Process Noise (PF) =====================
-// constexpr float Q_POS_DIFFUSION     = 1.2e-3f;
-constexpr float Q_POS_DIFFUSION     = 5.0e-4f;
-// constexpr float Q_YAW_DIFFUSION     = 4.0e-3f; 
-constexpr float Q_YAW_DIFFUSION     = 1.0e-3f;
+constexpr float Q_POS_DIFFUSION     = 1.2e-3f;
+//constexpr float Q_POS_DIFFUSION     = 5.0e-4f;
+ constexpr float Q_YAW_DIFFUSION     = 4.0e-3f; 
+//constexpr float Q_YAW_DIFFUSION     = 1.0e-3f;
 constexpr float Q_ACC_RANDOMWALK    = 6.0e-3f;  
 constexpr float Q_YAWACC_RANDOMWALK = 8.0e-4f;   
 
