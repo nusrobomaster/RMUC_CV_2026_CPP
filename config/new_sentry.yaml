@@ -1,0 +1,51 @@
+enemy_color: "red"
+
+# USB Camera 
+image_width: 1280                      # Desired image width captured from the USB camera
+image_height: 720                      # Desired image height captured from the USB camera
+fov_h: 57.7                            # Horizontal Field of View of the camera lens (in degrees)
+fov_v: 56.7                            # Vertical Field of View of the camera lens (in degrees)
+new_fov_h: 27                          # Adjusted horizontal FOV after potential digital zoom/cropping (used for calculations)
+new_fov_v: 40.9                        # Adjusted vertical FOV after potential digital zoom/cropping (used for calculations)
+usb_frame_rate: 120                    # Target frame rate for the USB camera (FPS)
+usb_exposure: 500                      # Exposure time setting for the USB camera (value range depends on the specific camera driver)
+usb_gamma: 160                         # Gamma correction value for the USB camera
+usb_gain: 10                           # Gain (sensitivity) setting for the USB camera
+
+# Hikcamera
+camera_name: "hikrobot"                # Identifier for the camera type (Hikvision in this case)
+exposure_ms: 0.8                       # Exposure time for the Hikvision camera (in milliseconds)
+gain: 16.9                             # Gain setting for the Hikvision camera
+vid_pid: "2bdf:0001"                   # Vendor ID and Product ID identifying the specific Hikvision camera model on the USB bus
+
+# Tracker
+min_detect_count: 5                    # Minimum number of consecutive detections needed to confirm a new target track
+max_temp_lost_count: 25                # Maximum number of frames a target can be undetected before the tracker considers it lost
+outpost_max_temp_lost_count: 75 
+
+## Aim State
+yaw_offset: -0.8                       # Static offset added to the calculated yaw command (to compensate for mechanical misalignments)
+pitch_offset: -1                       # Static offset added to the calculated pitch command
+comming_angle: 60                      # Angle threshold (in degrees) used in lead calculation when the target is approaching the gimbal
+leaving_angle: 20                      # Angle threshold (in degrees) used in lead calculation when the target is moving away from the gimbal
+left_yaw_offset: -1                    # Dynamic yaw offset when the gimbal is pointing significantly to the left
+right_yaw_offset: -0.6                 # Dynamic yaw offset when the gimbal is pointing significantly to the right
+decision_speed: 10                     # Threshold for target angular velocity (rad/s) above which different aiming logic might apply
+high_speed_delay_time: 0.026           # Additional time delay (in seconds) added to the prediction when the target is moving fast (accounts for bullet time-of-flight, control latency)
+low_speed_delay_time: 0.010            # Additional time delay (in seconds) added to the prediction when the target is moving slowly
+
+# Shooter
+first_tolerance: 5                     # Angular tolerance (in degrees) for determining if the gimbal is aligned enough to shoot at *close* range (distance < judge_distance)
+second_tolerance: 2                    # Angular tolerance (in degrees) for determining if the gimbal is aligned enough to shoot at *far* range (distance >= judge_distance)
+judge_distance: 3                      # Distance threshold (in meters) used to decide between first_tolerance and second_tolerance
+auto_fire: true                        # Whether the vision system automatically controls the firing mechanism
+
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]  # Rotation matrix defining the orientation of the IMU frame relative to the gimbal frame (often identity if IMU is on C-Board aligned with gimbal)
+
+# Camera intrinsic calibration parameters (obtained from calibrating the camera)
+camera_matrix: [2414.9359264386621, 0, 717.26243105567414, 0, 2418.0489262208148, 582.68540529942845, 0, 0, 1]  # [fx, 0, cx, 0, fy, cy, 0, 0, 1]
+distort_coeffs: [-0.0209453389287673, 0.15028138841073832, -0.0006517722113234505, -0.0016861906197686788, 0]  # [k1, k2, p1, p2, k3] - Distortion coefficients
+
+# Camera extrinsic calibration parameters (relationship between camera and gimbal)
+R_camera2gimbal: [0.01928451708725664, 0.00012696140743255463, 0.99981402834802846, -0.99981344688553653, -0.0010834913551969569, 0.019284643459122196, 0.0010857382619952124, -0.99999940496346484, 0.00010604311483339372]  # 3x3 Rotation matrix
+t_camera2gimbal: [0.13089617453251859, 0.0038468007459533785, 0.094139945222010288]  # 3x1 Translation vector (meters)
